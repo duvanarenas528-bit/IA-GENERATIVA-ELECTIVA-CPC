@@ -195,6 +195,13 @@ Sin embargo, mediante la auditoría humana se identificó que los resultados gen
 
 ⸻
 
+ Arquitectura y diagramas
+
+* [Diagrama de componentes](DOC/07_DIAGRAMA_COMPONENTES.md) — frontend, backend, Supabase y servicio de IA externo (Gemini).
+* [Diagrama de base de datos](DOC/08_DIAGRAMA_BASE_DATOS.md) — modelo relacional sobre Supabase/PostgreSQL.
+
+⸻
+
  Información académica
 
 Proyecto: IA Generativa — AutoCheck

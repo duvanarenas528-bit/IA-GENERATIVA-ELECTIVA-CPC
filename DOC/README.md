@@ -14,7 +14,8 @@ PREPERITAJE-VEHICULAR/
 │   ├── 03_PROMPT_HISTORIAS_USUARIO.md
 │   ├── 04_PROMPT_PRIORIZACION_MOSCOW.md
 │   ├── 05_PROMPT_PRODUCT_BACKLOG.md
-│   └── 06_PROMPT_JIRA_MCP.md
+│   ├── 06_PROMPT_JIRA_MCP.md
+│   └── 07_PROMPT_DIAGRAMAS.md
 │
 └── DOC/    → resultados / documentación generada en cada etapa
     ├── 01_TRANSCRIPCION.md
@@ -23,6 +24,8 @@ PREPERITAJE-VEHICULAR/
     ├── 04_PRIORIZACION_MOSCOW.md
     ├── 05_PRODUCT_BACKLOG.md
     ├── 06_JIRA_MCP.md
+    ├── 07_DIAGRAMA_COMPONENTES.md
+    ├── 08_DIAGRAMA_BASE_DATOS.md
     └── README.md   (este archivo)
 ```
 
@@ -33,6 +36,8 @@ PREPERITAJE-VEHICULAR/
 4. **Priorización MoSCoW** — clasificación de las historias según su importancia para el MVP.
 5. **Product Backlog** — organización de las historias en épicas, con estimación y sprint sugerido.
 6. **Conexión con Jira (MCP)** — creación de los issues del backlog en Jira a través de un conector MCP.
+7. **Diagrama de componentes** — arquitectura de alto nivel: frontend, backend, Supabase y servicio de IA externo (Gemini).
+8. **Diagrama de base de datos** — modelo relacional sobre Supabase/PostgreSQL (usuarios, vehículos, preperitajes, fotografías, preguntas y respuestas).
 
 ## Nota sobre el uso de IA
 Todos los resultados generados por la IA en las carpetas `DOC/` fueron sometidos a revisión crítica humana por el equipo antes de considerarse definitivos, en particular en la etapa de historias de usuario (ver la sección de auditoría en `DOC/03_HISTORIAS_USUARIO.md`).
