@@ -23,4 +23,4 @@ Requerimientos funcionales:
 
 ## Notas de uso
 - Se obtuvieron 7 historias de usuario (más de las 5 mínimas solicitadas).
-- El resultado se auditó de forma crítica en el paso de Parte 3 del taller (ver `DOC/03_HISTORIAS_USUARIO.md`).
+- El resultado se auditó de forma crítica en el paso de Parte 3 del taller (ver `03_HISTORIAS_USUARIO.md`).

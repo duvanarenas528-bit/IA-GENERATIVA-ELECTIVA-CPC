@@ -197,8 +197,11 @@ Sin embargo, mediante la auditoría humana se identificó que los resultados gen
 
  Arquitectura y diagramas
 
-* [Diagrama de componentes](DOC/07_DIAGRAMA_COMPONENTES.md) — frontend, backend, Supabase y servicio de IA externo (Gemini).
-* [Diagrama de base de datos](DOC/08_DIAGRAMA_BASE_DATOS.md) — modelo relacional sobre Supabase/PostgreSQL.
+* [Diagrama de componentes](mi-framework-ia/docs/proyecto/07_DIAGRAMA_COMPONENTES.md) — frontend, backend, Supabase y servicio de IA externo (Gemini).
+* [Diagrama de base de datos](mi-framework-ia/docs/proyecto/08_DIAGRAMA_BASE_DATOS.md) — modelo relacional sobre Supabase/PostgreSQL.
+* [Diagrama de clases](mi-framework-ia/docs/proyecto/09_DIAGRAMA_CLASES.md) — clases principales de AutoCheck y sus relaciones, coherentes con el modelo de datos.
+
+El detalle de cada etapa del proceso de análisis, y los prompts utilizados con la IA en cada una, están en [docs/proyecto/README.md](mi-framework-ia/docs/proyecto/README.md).
 
 ⸻
 

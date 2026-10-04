@@ -26,4 +26,4 @@ Historias priorizadas:
 ```
 
 ## Notas de uso
-- El backlog resultante (`DOC/05_PRODUCT_BACKLOG.md`) es el insumo directo para la creación de tickets en Jira mediante el conector MCP (ver `DOCIA/06_PROMPT_JIRA_MCP.md`).
+- El backlog resultante (`05_PRODUCT_BACKLOG.md`) es el insumo directo para la creación de tickets en Jira mediante el conector MCP (ver `06_PROMPT_JIRA_MCP.md`).

@@ -8,26 +8,47 @@ Aplicación web que permite a una persona realizar un preperitaje preliminar de 
 ```
 PREPERITAJE-VEHICULAR/
 │
-├── DOCIA/   → prompts utilizados con la IA en cada etapa
-│   ├── 01_PROMPT_TRANSCRIPCION.md
-│   ├── 02_PROMPT_REQUERIMIENTOS.md
-│   ├── 03_PROMPT_HISTORIAS_USUARIO.md
-│   ├── 04_PROMPT_PRIORIZACION_MOSCOW.md
-│   ├── 05_PROMPT_PRODUCT_BACKLOG.md
-│   ├── 06_PROMPT_JIRA_MCP.md
-│   └── 07_PROMPT_DIAGRAMAS.md
-│
-└── DOC/    → resultados / documentación generada en cada etapa
-    ├── 01_TRANSCRIPCION.md
-    ├── 02_REQUERIMIENTOS.md
-    ├── 03_HISTORIAS_USUARIO.md
-    ├── 04_PRIORIZACION_MOSCOW.md
-    ├── 05_PRODUCT_BACKLOG.md
-    ├── 06_JIRA_MCP.md
-    ├── 07_DIAGRAMA_COMPONENTES.md
-    ├── 08_DIAGRAMA_BASE_DATOS.md
-    └── README.md   (este archivo)
+└── mi-framework-ia/
+    │
+    ├── core/         → infraestructura compartida (memoria, LLM gateway, seguridad, observabilidad)
+    ├── agents/       → agentes concretos
+    ├── skills/       → skills concretas
+    ├── interfaces/   → API, CLI, chat UI
+    ├── config/       → configuración y ambientes
+    │
+    └── docs/
+        ├── prompts/    → prompts utilizados con la IA en cada etapa
+        │   ├── 01_PROMPT_TRANSCRIPCION.md
+        │   ├── 02_PROMPT_REQUERIMIENTOS.md
+        │   ├── 03_PROMPT_HISTORIAS_USUARIO.md
+        │   ├── 04_PROMPT_PRIORIZACION_MOSCOW.md
+        │   ├── 05_PROMPT_PRODUCT_BACKLOG.md
+        │   ├── 06_PROMPT_JIRA_MCP.md
+        │   └── 07_PROMPT_DIAGRAMAS.md
+        │
+        └── proyecto/   → resultados / documentación generada en cada etapa
+            ├── 01_TRANSCRIPCION.md
+            ├── 02_REQUERIMIENTOS.md
+            ├── 03_HISTORIAS_USUARIO.md
+            ├── 04_PRIORIZACION_MOSCOW.md
+            ├── 05_PRODUCT_BACKLOG.md
+            ├── 06_JIRA_MCP.md
+            ├── 07_DIAGRAMA_COMPONENTES.md
+            ├── 08_DIAGRAMA_BASE_DATOS.md
+            ├── 09_DIAGRAMA_CLASES.md
+            ├── README.md   (este archivo)
+            │
+            ├── base_datos/   → esquema real de PostgreSQL
+            │   ├── DATABASE POSTGRESQL       → volcado original (nombres en inglés)
+            │   ├── migracion_espanol.sql     → renombra el esquema al español
+            │   └── DATABASE POSTGRESQL ES.sql → volcado actual (nombres en español)
+            │
+            └── assets/       → imágenes de los diagramas
+                └── DIAGRAMA_BASE_DATOS.png   → ER del esquema actual (render de Mermaid)
 ```
+
+Los documentos de ambas carpetas se referencian entre sí por su nombre de archivo
+(`02_REQUERIMIENTOS.md`), ya que cada carpeta contiene una etapa completa del proceso.
 
 ## Flujo de trabajo seguido
 1. **Entrevista y transcripción** — simulación de una entrevista con el cliente para entender el problema y las necesidades.
@@ -38,6 +59,7 @@ PREPERITAJE-VEHICULAR/
 6. **Conexión con Jira (MCP)** — creación de los issues del backlog en Jira a través de un conector MCP.
 7. **Diagrama de componentes** — arquitectura de alto nivel: frontend, backend, Supabase y servicio de IA externo (Gemini).
 8. **Diagrama de base de datos** — modelo relacional sobre Supabase/PostgreSQL (usuarios, vehículos, preperitajes, fotografías, preguntas y respuestas).
+9. **Diagrama de clases** — clases principales de AutoCheck y sus relaciones, coherentes con el modelo de datos: cada clase corresponde a una tabla, salvo los objetos de valor (`ResultadoIA`) y las clases derivadas no persistidas (`Informe`).
 
 ## Nota sobre el uso de IA
-Todos los resultados generados por la IA en las carpetas `DOC/` fueron sometidos a revisión crítica humana por el equipo antes de considerarse definitivos, en particular en la etapa de historias de usuario (ver la sección de auditoría en `DOC/03_HISTORIAS_USUARIO.md`).
+Todos los resultados generados por la IA en `docs/proyecto/` fueron sometidos a revisión crítica humana por el equipo antes de considerarse definitivos, en particular en la etapa de historias de usuario (ver la sección de auditoría en `03_HISTORIAS_USUARIO.md`).

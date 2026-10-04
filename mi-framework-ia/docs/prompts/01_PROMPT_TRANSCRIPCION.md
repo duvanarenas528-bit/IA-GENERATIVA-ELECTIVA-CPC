@@ -28,5 +28,5 @@ Cliente), en español, sin jerga técnica de parte del cliente.
 ```
 
 ## Notas de uso
-- Este prompt se ejecutó una sola vez y el resultado se copió sin ediciones mayores a `DOC/01_TRANSCRIPCION.md`.
+- Este prompt se ejecutó una sola vez y el resultado se copió sin ediciones mayores a `01_TRANSCRIPCION.md`.
 - Se usó como paso previo a la extracción de requerimientos (Parte 1 del taller).

@@ -37,9 +37,11 @@ Info del proyecto:
 ```
 
 ## Resultado esperado
-- Diagrama de componentes → `DOC/07_DIAGRAMA_COMPONENTES.md`.
-- Diagrama de base de datos → `DOC/08_DIAGRAMA_BASE_DATOS.md`.
+- Diagrama de componentes → `07_DIAGRAMA_COMPONENTES.md`.
+- Diagrama de base de datos → `08_DIAGRAMA_BASE_DATOS.md`.
+- Diagrama de clases → `09_DIAGRAMA_CLASES.md`.
 
 ## Notas de uso
-- Los diagramas deben mantener coherencia con el Product Backlog (`DOC/05_PRODUCT_BACKLOG.md`) y con las historias de seguridad (RLS) y de repetición del análisis.
+- Los diagramas deben mantener coherencia con el Product Backlog (`05_PRODUCT_BACKLOG.md`) y con las historias de seguridad (RLS) y de repetición del análisis.
 - El modelo debe reflejar que el valor estimado es un rango (`valor_min`/`valor_max`) y que el resultado completo de la IA se conserva como JSON.
+- El diagrama de clases se generó como extensión de esta etapa, a partir del modelo de datos ya aprobado (`08_DIAGRAMA_BASE_DATOS.md`). El prompt original de esta sección, que solicita dos diagramas, se conserva sin modificar para no alterar el registro de lo ejecutado; si se vuelve a ejecutar, añadir un tercer bloque `3) Diagrama de clases (classDiagram)`.
