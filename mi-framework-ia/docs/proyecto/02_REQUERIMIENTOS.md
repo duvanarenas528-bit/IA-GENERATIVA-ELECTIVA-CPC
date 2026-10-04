@@ -33,4 +33,4 @@
 | RNF06 | El sistema debe ser escalable a nivel de código para permitir agregar más criterios de análisis en el futuro. |
 
 ## Fuente
-Extraído a partir de `DOC/01_TRANSCRIPCION.md` usando el prompt en `DOCIA/02_PROMPT_REQUERIMIENTOS.md`.
+Extraído a partir de `01_TRANSCRIPCION.md` usando el prompt en `02_PROMPT_REQUERIMIENTOS.md`.

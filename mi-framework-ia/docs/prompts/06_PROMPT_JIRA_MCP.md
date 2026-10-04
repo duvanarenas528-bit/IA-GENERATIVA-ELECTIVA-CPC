@@ -26,5 +26,5 @@ mapeados contra el ID interno del backlog (PV-XX).
 
 ## Notas de uso
 - Este paso requiere tener configurado el conector MCP de Jira con las credenciales del workspace del equipo.
-- El resultado (issues creados, IDs de Jira, y su mapeo con el backlog) queda documentado en `DOC/06_JIRA_MCP.md`.
+- El resultado (issues creados, IDs de Jira, y su mapeo con el backlog) queda documentado en `06_JIRA_MCP.md`.
 - Si en el momento de la sustentación no se cuenta con acceso real a Jira, este archivo puede documentarse como una simulación del flujo, dejando explícito que el mapeo y los IDs son ilustrativos.

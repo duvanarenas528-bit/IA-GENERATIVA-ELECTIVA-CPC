@@ -3,7 +3,7 @@
 **Proyecto Jira:** PREPERITAJE VEHICULAR (clave sugerida: `PV`)
 
 ## Resumen del proceso
-Usando el prompt/instrucción de `DOCIA/06_PROMPT_JIRA_MCP.md`, se conectó el asistente de IA al servidor MCP de Jira y se generaron los issues correspondientes a cada elemento del Product Backlog (`DOC/05_PRODUCT_BACKLOG.md`).
+Usando el prompt/instrucción de `06_PROMPT_JIRA_MCP.md`, se conectó el asistente de IA al servidor MCP de Jira y se generaron los issues correspondientes a cada elemento del Product Backlog (`05_PRODUCT_BACKLOG.md`).
 
 ## Mapeo Backlog → Jira
 
@@ -25,6 +25,6 @@ Usando el prompt/instrucción de `DOCIA/06_PROMPT_JIRA_MCP.md`, se conectó el a
 
 ## Siguientes pasos sugeridos
 1. Verificar que el conector MCP de Jira esté autenticado con el workspace del equipo.
-2. Ejecutar el prompt de `DOCIA/06_PROMPT_JIRA_MCP.md` contra el backlog real.
+2. Ejecutar el prompt de `06_PROMPT_JIRA_MCP.md` contra el backlog real.
 3. Reemplazar los IDs sugeridos en la tabla anterior por los IDs reales devueltos por Jira.
 4. Verificar en el tablero Scrum/Kanban del proyecto que las historias Must (Sprint 1) queden como primeras en el backlog.

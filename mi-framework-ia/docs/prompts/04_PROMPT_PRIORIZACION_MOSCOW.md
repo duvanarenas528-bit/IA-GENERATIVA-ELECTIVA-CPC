@@ -22,4 +22,4 @@ Historias:
 
 ## Notas de uso
 - Se usó como entrada la lista completa de 7 historias generadas por IA más las 3 historias adicionales identificadas en la auditoría humana (10 en total).
-- El resultado de esta priorización alimenta directamente el Product Backlog (`DOC/05_PRODUCT_BACKLOG.md`).
+- El resultado de esta priorización alimenta directamente el Product Backlog (`05_PRODUCT_BACKLOG.md`).
