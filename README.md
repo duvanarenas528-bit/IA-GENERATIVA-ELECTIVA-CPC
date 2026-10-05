@@ -218,4 +218,4 @@ Integrantes:
 
 Tutor: Esteban
 Ciudad: Ibagué
-Fecha: 02/08/2026
+Fecha: 05/10/2026
