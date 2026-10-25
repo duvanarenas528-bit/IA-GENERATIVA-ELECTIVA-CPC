@@ -4,8 +4,6 @@ Este diagrama refleja el **esquema real implementado** en PostgreSQL 16.3 con la
 
 El esquema se organiza en dos esquemas: `public` (datos de la aplicación) y `meta` (infraestructura interna: migraciones y almacén vectorial del RAG).
 
-![Diagrama de base de datos de AutoCheck](assets/DIAGRAMA_BASE_DATOS.png)
-
 ```mermaid
 erDiagram
     USUARIOS {
@@ -241,17 +239,6 @@ Estas diferencias ya existen en la base y conviene resolverlas antes de dar por 
 9. **Placa única global.** `vehiculos.placa` tiene `UNIQUE`, así que dos usuarios no pueden registrar el mismo vehículo. Es una decisión de negocio, no técnica, y conviene confirmarla.
 10. **`usuarios.contrasena_hash` sin usar.** La columna existe pero Supabase Auth gestiona la contraseña. Conviene eliminarla o documentar que se reserva para migración de usuarios.
 
-## Migración de nombres al español
-
-El esquema se creó originalmente en inglés (`users`, `assessments`, `vehicle_photos`…). `base_datos/migracion_espanol.sql` renombra los 12 objetos de tabla, 62 columnas, 5 índices, 29 constraints y traduce los valores de los 4 CHECK. Solo cambia identificadores y vocabulario: no altera tipos, claves ni datos.
-
-- `base_datos/DATABASE POSTGRESQL` — volcado original en inglés, conservado como registro histórico.
-- `base_datos/DATABASE POSTGRESQL ES.sql` — volcado actual tras la migración.
-
-La migración se verificó ejecutándola sobre PostgreSQL 16.3 con `pgvector`: conserva los datos existentes, traduce los valores de estado ya almacenados y los CHECK resultantes rechazan los valores en inglés.
-
 ## Fuente
 
 Volcado `base_datos/DATABASE POSTGRESQL ES.sql` (PostgreSQL 16.3 + pgvector). Las etapas previas de requerimientos, historias de usuario y diagramas están en `02_REQUERIMIENTOS.md`, `03_HISTORIAS_USUARIO.md` y `07_DIAGRAMA_COMPONENTES.md`.
-
-Este documento sustituye a la propuesta de diseño anterior, que describía seis tablas en español y no coincidía con el esquema implementado.

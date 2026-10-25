@@ -1,0 +1,6 @@
+{
+  "name": "AutoCheck - Preperitaje y Diagnóstico Vehicular IA",
+  "description": "Plataforma telemática de diagnóstico preliminar vehicular con visión artificial multimodal (Gemini Vision) para detección de anomalías, integridad estructural y tasación en Colombia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
