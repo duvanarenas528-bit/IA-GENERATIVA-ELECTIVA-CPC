@@ -23,10 +23,15 @@ import { AdminDashboardScreen } from './screens/AdminDashboardScreen';
 import { AdminAuditoriaScreen } from './screens/AdminAuditoriaScreen';
 import { AdminMetricasScreen } from './screens/AdminMetricasScreen';
 import { LoginScreen } from './screens/LoginScreen';
+import { reportIdFromPath, resetAppPath } from './services/navigation';
 
 function AppContent() {
   const { isAuthenticated, loading } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>(isAuthenticated ? 'dashboard' : 'login-user');
+  const initialReportId = reportIdFromPath();
+  const [reportId, setReportId] = useState<string | null>(initialReportId);
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>(
+    initialReportId ? 'informe-detallado' : isAuthenticated ? 'dashboard' : 'login-user'
+  );
 
   useEffect(() => {
     if (!loading) {
@@ -36,6 +41,28 @@ function AppContent() {
       if (isAuthenticated && currentScreen.startsWith('login')) {
         setCurrentScreen('dashboard');
       }
+    }
+  }, [isAuthenticated, loading]);
+
+  useEffect(() => {
+    const syncFromPath = () => {
+      const id = reportIdFromPath();
+      if (id) {
+        setReportId(id);
+        setCurrentScreen('informe-detallado');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('popstate', syncFromPath);
+    return () => window.removeEventListener('popstate', syncFromPath);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !isAuthenticated) return;
+    const id = reportIdFromPath();
+    if (id) {
+      setReportId(id);
+      setCurrentScreen('informe-detallado');
     }
   }, [isAuthenticated, loading]);
 
@@ -52,6 +79,9 @@ function AppContent() {
       setCurrentScreen('login-user');
       return;
     }
+    const keepReport = ['informe-detallado', 'ficha-venta', 'visor-a4'].includes(screen);
+    resetAppPath();
+    if (!keepReport) setReportId(null);
     setCurrentScreen(screen);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -97,7 +127,7 @@ function AppContent() {
         )}
 
         {currentScreen === 'ficha-venta' && isAuthenticated && (
-          <FichaVentaScreen onNavigate={handleNavigate} />
+          <FichaVentaScreen onNavigate={handleNavigate} preperitajeId={reportId} />
         )}
 
         {currentScreen === 'analisis-vivo' && isAuthenticated && (
@@ -105,11 +135,11 @@ function AppContent() {
         )}
 
         {currentScreen === 'informe-detallado' && isAuthenticated && (
-          <InformeDetalladoScreen onNavigate={handleNavigate} />
+          <InformeDetalladoScreen onNavigate={handleNavigate} preperitajeId={reportId} />
         )}
 
         {currentScreen === 'visor-a4' && isAuthenticated && (
-          <VisorA4Screen onNavigate={handleNavigate} />
+          <VisorA4Screen onNavigate={handleNavigate} preperitajeId={reportId} />
         )}
 
         {currentScreen === 'guia-inspeccion' && isAuthenticated && (

@@ -47,9 +47,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ initialRole = 'user', 
       const res = await registerWithEmail(name, email, password);
       if (res.success) {
         setSuccessMsg('Cuenta creada con éxito');
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 400);
       } else {
         setErrorMsg(res.error || 'No se pudo crear la cuenta');
       }
@@ -57,9 +54,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ initialRole = 'user', 
       const res = await loginWithEmail(email, password);
       if (res.success) {
         setSuccessMsg('Bienvenido');
-        setTimeout(() => {
-          onNavigate('dashboard');
-        }, 300);
       } else {
         setErrorMsg(res.error || 'Correo o contraseña incorrectos');
       }
@@ -232,7 +226,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ initialRole = 'user', 
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.value)}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-600"
                   />
                   <span>Recordarme</span>

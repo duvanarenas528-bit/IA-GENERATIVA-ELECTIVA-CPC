@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import vehiclesRouter, { reportsRouter } from './routes/vehicles.js';
+import preperitajesRouter from './routes/preperitajes.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/preperitajes', preperitajesRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);

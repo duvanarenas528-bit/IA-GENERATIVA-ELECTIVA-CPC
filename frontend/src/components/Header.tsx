@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { ScreenId } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { assetUrl } from '../services/api';
 import { AutoCheckLogo } from './AutoCheckLogo';
 
 interface HeaderProps {
@@ -27,6 +28,10 @@ export const Header: React.FC<HeaderProps> = ({ currentScreen, onNavigate }) => 
 
   const handleLogout = async () => {
     setIsProfileMenuOpen(false);
+    try {
+      localStorage.removeItem('autocheck_preperitaje_draft');
+      sessionStorage.removeItem('autocheck_preperitaje_draft');
+    } catch {}
     await logout();
     onNavigate('login-user');
   };
@@ -71,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({ currentScreen, onNavigate }) => 
                 className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <img
-                  src={user?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=250&q=80'}
+                  src={user?.avatar ? assetUrl(user.avatar) : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=250&q=80'}
                   alt={user?.name || 'Usuario'}
                   className="w-8 h-8 rounded-full object-cover border border-slate-200"
                 />

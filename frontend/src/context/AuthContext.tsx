@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserAccount } from '../types';
-import { authMe, authLogin, authRegister, authLogout, setUnauthorizedHandler } from '../services/api';
+import {
+  authMe,
+  authLogin,
+  authRegister,
+  authLogout,
+  authUploadAvatar,
+  authDeleteAvatar,
+  setUnauthorizedHandler,
+} from '../services/api';
 
 interface AuthContextType {
   user: UserAccount | null;
@@ -8,11 +16,24 @@ interface AuthContextType {
   loading: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   registerWithEmail: (name: string, email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  uploadAvatar: (file: File) => Promise<{ success: boolean; error?: string }>;
+  removeAvatar: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   forceLogout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function toUserAccount(u: any): UserAccount {
+  return {
+    id: u.id,
+    name: u.nombre || u.name,
+    email: u.correo || u.email,
+    avatar: u.avatar || undefined,
+    role: 'user',
+    authProvider: 'local',
+  };
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserAccount | null>(null);
@@ -32,13 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const me = await authMe();
         if (me) {
-          setUser({
-            id: me.id,
-            name: me.nombre || me.name,
-            email: me.correo || me.email,
-            role: 'user',
-            authProvider: 'local',
-          });
+          setUser(toUserAccount(me));
         } else {
           setUser(null);
         }
@@ -53,14 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await authLogin(email, pass);
-      const u = res.user;
-      setUser({
-        id: u.id,
-        name: u.nombre || u.name,
-        email: u.correo || u.email,
-        role: 'user',
-        authProvider: 'local',
-      });
+      setUser(toUserAccount(res.user));
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message === 'UNAUTHORIZED' ? 'Correo o contraseña incorrectos' : (e.message || 'Correo o contraseña incorrectos') };
@@ -73,22 +81,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'La contraseña debe tener al menos 8 caracteres' };
       }
       const res = await authRegister(name, email, pass);
-      const u = res.user;
-      setUser({
-        id: u.id,
-        name: u.nombre || u.name,
-        email: u.correo || u.email,
-        role: 'user',
-        authProvider: 'local',
-      });
+      setUser(toUserAccount(res.user));
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'No se pudo registrar' };
     }
   };
 
+  const uploadAvatar = async (file: File): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await authUploadAvatar(file);
+      setUser((prev) => (prev ? { ...prev, avatar: res.user?.avatar || undefined } : prev));
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'No se pudo subir la foto de perfil' };
+    }
+  };
+
+  const removeAvatar = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await authDeleteAvatar();
+      setUser((prev) => (prev ? { ...prev, avatar: undefined } : prev));
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'No se pudo eliminar la foto de perfil' };
+    }
+  };
+
   const logout = async () => {
     await authLogout();
+    try {
+      localStorage.removeItem('autocheck_preperitaje_draft');
+      sessionStorage.removeItem('autocheck_preperitaje_draft');
+    } catch {}
     setUser(null);
   };
 
@@ -104,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         loginWithEmail,
         registerWithEmail,
+        uploadAvatar,
+        removeAvatar,
         logout,
         forceLogout,
       }}

@@ -1,99 +1,112 @@
 import React, { useState } from 'react';
 import { ScreenId, VehiclePartEvaluation, PartCondition } from '../types';
 import { AutoCheckLogo } from '../components/AutoCheckLogo';
+import { createPreperitaje, updatePreperitaje, uploadPreperitajeFoto, assetUrl } from '../services/api';
+import { openReport } from '../services/navigation';
 
 interface NuevoPreperitajeScreenProps {
   onNavigate: (screen: ScreenId) => void;
 }
 
+const INITIAL_PARTS: VehiclePartEvaluation[] = [
+  {
+    id: 'lateral-der',
+    name: '1. Lateral Derecho (Puertas, guardabarros y retrovisor)',
+    category: 'exterior',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'lateral-izq',
+    name: '2. Lateral Izquierdo (Puertas y costado)',
+    category: 'exterior',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'frente-capo',
+    name: '3. Frente y Capó (Parachoques, persiana y faros)',
+    category: 'exterior',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'trasera-baul',
+    name: '4. Parte Trasera y Maletero (Parachoques y compuerta)',
+    category: 'exterior',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'techo-vidrios',
+    name: '5. Techo y Cristales (Parabrisas y panorámicos)',
+    category: 'exterior',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'vano-motor',
+    name: '6. Compartimiento del Motor (Encendido y fluidos)',
+    category: 'mecanica',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'llantas-frenos',
+    name: '7. Llantas y Rines (Banda de rodadura y frenado)',
+    category: 'tren_rodante',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+  {
+    id: 'interior-odometro',
+    name: '8. Interior y Odómetro (Tablero, tapicería y testigos)',
+    category: 'interior',
+    condition: 'good',
+    userObservations: '',
+    severity: 'optima',
+  },
+];
+
+const PHOTO_SLOTS = [
+  { slot: 'frontal', title: '01. Frontal Tres Cuartos', desc: 'Encuadre de frente y costado' },
+  { slot: 'lateral', title: '02. Lateral Completo', desc: 'Perfil del vehículo' },
+  { slot: 'motor', title: '03. Vano Motor', desc: 'Compartimiento mecánico' },
+  { slot: 'odometro', title: '04. Odómetro y Tablero', desc: 'Lectura de kilómetros' },
+  { slot: 'trasera', title: '05. Parte Trasera', desc: 'Maletero y parachoques' },
+  { slot: 'interior', title: '06. Interior / Tapicería', desc: 'Asientos y consola' },
+];
+
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ onNavigate }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   // Vehicle Data (Step 1)
-  const [plate, setPlate] = useState('HKS-482');
-  const [brand, setBrand] = useState('Renault');
-  const [model, setModel] = useState('Duster');
-  const [year, setYear] = useState('2021');
-  const [mileage, setMileage] = useState('45210');
-  const [color, setColor] = useState('Blanco Glaciar');
-  const [fuelType, setFuelType] = useState('Gasolina');
-  const [transmission, setTransmission] = useState('Manual 4x2');
+  const [plate, setPlate] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [year, setYear] = useState('');
+  const [mileage, setMileage] = useState('');
+  const [color, setColor] = useState('');
+  const [fuelType, setFuelType] = useState('');
+  const [transmission, setTransmission] = useState('');
+  const [preperitajeId, setPreperitajeId] = useState<string | null>(null);
 
   // Parts Questionnaire (Step 2: El usuario nos cuenta el estado)
-  const [parts, setParts] = useState<VehiclePartEvaluation[]>([
-    {
-      id: 'lateral-der',
-      name: '1. Lateral Derecho (Puertas, guardabarros y retrovisor)',
-      category: 'exterior',
-      condition: 'scratches',
-      userObservations: 'Tiene un rayón superficial leve en la puerta trasera por roce en estacionamiento. No tiene golpes hundidos.',
-      severity: 'baja',
-    },
-    {
-      id: 'lateral-izq',
-      name: '2. Lateral Izquierdo (Puertas y costado)',
-      category: 'exterior',
-      condition: 'good',
-      userObservations: 'Pintura original de fábrica, sin rayones ni golpes.',
-      severity: 'optima',
-    },
-    {
-      id: 'frente-capo',
-      name: '3. Frente y Capó (Parachoques, persiana y faros)',
-      category: 'exterior',
-      condition: 'good',
-      userObservations: 'Faros nítidos sin opacidad. Capó cierra suavemente sin desajustes.',
-      severity: 'optima',
-    },
-    {
-      id: 'trasera-baul',
-      name: '4. Parte Trasera y Maletero (Parachoques y compuerta)',
-      category: 'exterior',
-      condition: 'good',
-      userObservations: 'Compuerta trasera ajusta perfectamente, sensores de reversa funcionando.',
-      severity: 'optima',
-    },
-    {
-      id: 'techo-vidrios',
-      name: '5. Techo y Cristales (Parabrisas y panorámicos)',
-      category: 'exterior',
-      condition: 'good',
-      userObservations: 'Parabrisas original sin piquetes de piedras ni fisuras.',
-      severity: 'optima',
-    },
-    {
-      id: 'vano-motor',
-      name: '6. Compartimiento del Motor (Encendido y fluidos)',
-      category: 'mecanica',
-      condition: 'good',
-      userObservations: 'Motor parejo, sin botes ni fugas de aceite. Líquido refrigerante y frenos a nivel.',
-      severity: 'optima',
-    },
-    {
-      id: 'llantas-frenos',
-      name: '7. Llantas y Rines (Banda de rodadura y frenado)',
-      category: 'tren_rodante',
-      condition: 'good',
-      userObservations: 'Llantas Michelin con buen labrado (más de media vida). Rines sin golpes fuertes.',
-      severity: 'optima',
-    },
-    {
-      id: 'interior-odometro',
-      name: '8. Interior y Odómetro (Tablero, tapicería y testigos)',
-      category: 'interior',
-      condition: 'good',
-      userObservations: 'Odómetro marca 45.210 km reales. Sin testigos encendidos de Check Engine ni Airbag.',
-      severity: 'optima',
-    },
-  ]);
+  const [parts, setParts] = useState<VehiclePartEvaluation[]>(INITIAL_PARTS);
 
   // Photo Uploads (Step 3: Guardar fotos en la plataforma)
-  const [uploadedPhotos, setUploadedPhotos] = useState<{ [key: string]: string }>({
-    frontal: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80',
-    lateral: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=600&q=80',
-    motor: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-    odometro: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=600&q=80',
-  });
+  const [uploadedPhotos, setUploadedPhotos] = useState<{ [key: string]: string }>({});
+  const [uploadingPhoto, setUploadingPhoto] = useState<{ [key: string]: boolean }>({});
 
   const conditionOptions: { value: PartCondition; label: string; icon: string; color: string }[] = [
     { value: 'good', label: 'En buen estado / Original', icon: 'check_circle', color: 'border-emerald-500 bg-emerald-50 text-emerald-800' },
@@ -123,26 +136,46 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
     );
   };
 
-  const handleSimulateUpload = (slot: string) => {
-    // Allows user to upload or toggle photo
-    const sampleUrls: { [key: string]: string } = {
-      frontal: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80',
-      lateral: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=600&q=80',
-      motor: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-      odometro: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=600&q=80',
-      trasera: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80',
-      interior: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80',
-    };
+  const openPhotoPicker = (slot: string) => {
+    document.getElementById(`photo-input-${slot}`)?.click();
+  };
 
-    setUploadedPhotos((prev) => ({
-      ...prev,
-      [slot]: sampleUrls[slot] || sampleUrls.frontal,
-    }));
+  const handlePhotoSelected = async (slot: string, file?: File) => {
+    if (!file) return;
+
+    if (!preperitajeId) {
+      alert('Primero guarda los datos del vehículo para poder subir fotos.');
+      return;
+    }
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      alert('Formato no válido. Solo se permiten imágenes JPG, PNG o WEBP.');
+      return;
+    }
+    if (file.size > MAX_PHOTO_SIZE) {
+      alert('La imagen supera el tamaño máximo de 5 MB. Elige una imagen más liviana.');
+      return;
+    }
+
+    setUploadingPhoto((prev) => ({ ...prev, [slot]: true }));
+    try {
+      const res = await uploadPreperitajeFoto(preperitajeId, slot, file);
+      setUploadedPhotos((prev) => ({
+        ...prev,
+        [slot]: assetUrl(res.foto.url),
+      }));
+    } catch (e: any) {
+      alert(e.message || 'No se pudo subir la foto. Intenta nuevamente.');
+    } finally {
+      setUploadingPhoto((prev) => ({ ...prev, [slot]: false }));
+    }
   };
 
   const handleGenerateReport = () => {
-    // Go to Live Analysis or Detailed Report
-    onNavigate('analisis-vivo');
+    if (!preperitajeId) {
+      alert('Primero guarda los datos del vehículo.');
+      return;
+    }
+    openReport(preperitajeId);
   };
 
   return (
@@ -353,7 +386,46 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
             <div className="pt-4 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
-                onClick={() => setCurrentStep(2)}
+                onClick={async () => {
+                  const yearNum = parseInt(year);
+                  const currentYear = new Date().getFullYear();
+                  if (!plate) return alert('Placa requerida');
+                  if (!yearNum || yearNum < 1980 || yearNum > currentYear + 1) return alert('Año inválido');
+                  const mileageNum = mileage === '' ? null : parseInt(mileage);
+                  if (mileage !== '' && (isNaN(mileageNum as number) || (mileageNum as number) < 0)) return alert('Kilometraje inválido');
+                  try {
+                    if (!preperitajeId) {
+                      const res = await createPreperitaje({
+                        placa: plate,
+                        marca: brand,
+                        linea: model,
+                        anio: yearNum,
+                        kilometraje: mileageNum,
+                        color,
+                        combustible: fuelType,
+                        transmision: transmission,
+                        respuestas: {},
+                        estado: 'borrador',
+                      });
+                      setPreperitajeId(res.preperitaje.id);
+                    } else {
+                      await updatePreperitaje(preperitajeId, {
+                        placa: plate,
+                        marca: brand,
+                        linea: model,
+                        anio: yearNum,
+                        kilometraje: mileageNum,
+                        color,
+                        combustible: fuelType,
+                        transmision: transmission,
+                      });
+                    }
+                  } catch (e: any) {
+                    alert(e.message || 'Error al guardar');
+                    return;
+                  }
+                  setCurrentStep(2);
+                }}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-2"
               >
                 <span>Continuar a Evaluación de Partes</span>
@@ -483,48 +555,80 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
 
             {/* Photo Slots Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { slot: 'frontal', title: '01. Frontal Tres Cuartos', desc: 'Encuadre de frente y costado' },
-                { slot: 'lateral', title: '02. Lateral Completo', desc: 'Perfil del vehículo' },
-                { slot: 'motor', title: '03. Vano Motor', desc: 'Compartimiento mecánico' },
-                { slot: 'odometro', title: '04. Odómetro y Tablero', desc: 'Lectura de kilómetros' },
-                { slot: 'trasera', title: '05. Parte Trasera', desc: 'Maletero y parachoques' },
-                { slot: 'interior', title: '06. Interior / Tapicería', desc: 'Asientos y consola' },
-              ].map((item) => (
-                <div
-                  key={item.slot}
-                  className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 space-y-2"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <strong className="text-slate-800">{item.title}</strong>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                      Guardada
-                    </span>
-                  </div>
+              {PHOTO_SLOTS.map((item) => {
+                const isUploading = !!uploadingPhoto[item.slot];
+                const hasPhoto = !!uploadedPhotos[item.slot];
 
-                  <div className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-200 relative group">
-                    <img
-                      src={
-                        uploadedPhotos[item.slot] ||
-                        'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=400&q=80'
-                      }
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSimulateUpload(item.slot)}
-                        className="px-3 py-1.5 bg-white text-slate-900 rounded-lg text-xs font-bold shadow"
+                return (
+                  <div
+                    key={item.slot}
+                    className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <strong className="text-slate-800">{item.title}</strong>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          hasPhoto
+                            ? 'text-emerald-600 bg-emerald-50'
+                            : 'text-slate-500 bg-slate-100'
+                        }`}
                       >
-                        Cambiar Foto
-                      </button>
+                        {hasPhoto ? 'Guardada' : 'Pendiente'}
+                      </span>
                     </div>
-                  </div>
 
-                  <p className="text-[11px] text-slate-500">{item.desc}</p>
-                </div>
-              ))}
+                    <input
+                      id={`photo-input-${item.slot}`}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        handlePhotoSelected(item.slot, file);
+                        e.target.value = '';
+                      }}
+                    />
+
+                    <div
+                      className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-200 relative group"
+                      onClick={() => openPhotoPicker(item.slot)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') openPhotoPicker(item.slot);
+                      }}
+                    >
+                      {hasPhoto ? (
+                        <img
+                          src={uploadedPhotos[item.slot]}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
+                          <span className="material-symbols-outlined text-2xl">add_photo_alternate</span>
+                          <span className="text-[11px] font-semibold">Sin foto</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPhotoPicker(item.slot);
+                          }}
+                          disabled={isUploading}
+                          className="px-3 py-1.5 bg-white text-slate-900 rounded-lg text-xs font-bold shadow"
+                        >
+                          {isUploading ? 'Subiendo...' : hasPhoto ? 'Cambiar Foto' : 'Subir Foto'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500">{item.desc}</p>
+                  </div>
+                );
+              })}
             </div>
 
             {/* AI Recommendation Preview Banner */}
@@ -554,7 +658,20 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
 
               <button
                 type="button"
-                onClick={handleGenerateReport}
+                onClick={async () => {
+                  try {
+                    if (preperitajeId) {
+                      await updatePreperitaje(preperitajeId, {
+                        estado: 'completado',
+                        respuestas: parts,
+                      });
+                    }
+                  } catch (e: any) {
+                    alert(e.message || 'Error al guardar');
+                    return;
+                  }
+                  handleGenerateReport();
+                }}
                 className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-base">auto_awesome</span>
