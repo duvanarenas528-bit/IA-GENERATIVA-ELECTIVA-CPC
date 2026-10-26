@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScreenId } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { useVehicles } from '../context/VehicleContext';
+import { getDashboardStats, listPreperitajes } from '../services/api';
+import { openReport } from '../services/navigation';
 
 interface DashboardScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -9,8 +10,26 @@ interface DashboardScreenProps {
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   const { user } = useAuth();
-  const { myActiveVehicles, myTransferredVehicles, setSelectedVehicle, resetDefaultVehicles } = useVehicles();
   const [filter, setFilter] = useState<'all' | 'completed' | 'alerts'>('all');
+  const [stats, setStats] = useState({ total: 0, completados: 0, conObservaciones: 0, alertas: 0 });
+  const [preperitajes, setPreperitajes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await getDashboardStats();
+        setStats(s.stats || { total: 0, completados: 0, conObservaciones: 0, alertas: 0 });
+        const p = await listPreperitajes();
+        setPreperitajes(p.preperitajes || []);
+      } catch {
+        setStats({ total: 0, completados: 0, conObservaciones: 0, alertas: 0 });
+        setPreperitajes([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <div className="w-full pt-20 bg-surface min-h-[calc(100vh-140px)]">
@@ -37,7 +56,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
                 <span>Motor Neuronal Gemini Flash Vision v2.4 Activo</span>
               </div>
               <h1 className="font-headline-lg text-headline-lg text-on-primary tracking-tight">
-                Bienvenido de nuevo, {user?.name || 'Lenin Murillo'}
+                Bienvenido de nuevo, {user?.name || ''}
               </h1>
               <p className="font-body-lg text-body-lg text-primary-fixed mt-1">
                 Realiza diagnósticos preliminares de vehículos con IA antes de un peritaje oficial. Identifica repintados, desgastes atípicos y desajustes de carrocería en minutos.
@@ -83,10 +102,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="font-headline-lg text-headline-lg text-on-surface">6</span>
-              <span className="font-label-md text-label-md text-tertiary-container flex items-center font-semibold">
-                <span className="material-symbols-outlined text-[16px]">trending_up</span> +2 este mes
-              </span>
+              <span className="font-headline-lg text-headline-lg text-on-surface">{stats.total}</span>
             </div>
             <span className="font-body-sm text-body-sm text-outline mt-1">Vehículos registrados y analizados</span>
           </div>
@@ -100,10 +116,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="font-headline-lg text-headline-lg text-on-surface">$1.350.000</span>
-              <span className="font-label-sm text-label-sm text-outline">COP</span>
+              <span className="font-headline-lg text-headline-lg text-on-surface">—</span>
             </div>
-            <span className="font-body-sm text-body-sm text-tertiary-container font-semibold mt-1">Descartados peritajes infructuosos</span>
+            <span className="font-body-sm text-body-sm text-outline mt-1">No medible</span>
           </div>
 
           {/* Metric 3 */}
@@ -115,7 +130,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="font-headline-lg text-headline-lg text-error">2</span>
+              <span className="font-headline-lg text-headline-lg text-on-surface">{stats.alertas}</span>
               <span className="font-label-md text-label-md text-outline">detectadas</span>
             </div>
             <span className="font-body-sm text-body-sm text-outline mt-1">Repintados y anomalías mecánicas</span>
@@ -130,13 +145,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="font-headline-lg text-headline-lg text-primary">94.2%</span>
+              <span className="font-headline-lg text-headline-lg text-on-surface">—</span>
               <span className="font-label-sm text-label-sm text-outline">F-Score</span>
             </div>
-            <div className="w-full bg-surface-container-high rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-secondary h-1.5 rounded-full" style={{ width: '94.2%' }}></div>
-            </div>
-            <span className="font-body-sm text-body-sm text-outline mt-1">Gemini Vision Pre-trained Model</span>
+            <span className="font-body-sm text-body-sm text-outline mt-1">No medible</span>
           </div>
         </section>
 
@@ -160,7 +172,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
                   }`}
                   type="button"
                 >
-                  Todos (3)
+                  Todos ({preperitajes.length})
                 </button>
                 <button
                   onClick={() => setFilter('completed')}
@@ -183,75 +195,58 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               </div>
             </div>
 
-            {/* Transferred Vehicles Banner if any */}
-            {myTransferredVehicles.length > 0 && (
-              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs space-y-2 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <strong className="text-emerald-900 flex items-center gap-1.5 font-bold">
-                    <span className="material-symbols-outlined text-base text-emerald-600">assignment_turned_in</span>
-                    Vehículos Transferidos / Vendidos a Nuevos Dueños ({myTransferredVehicles.length})
-                  </strong>
-                  <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono font-bold">
-                    Traspaso In-App
-                  </span>
-                </div>
-                <p className="text-emerald-800 text-[11px]">
-                  Estos vehículos ya no están activos en tu garaje porque le transferiste formalmente la custodia al nuevo comprador:
-                </p>
-                <div className="space-y-2">
-                  {myTransferredVehicles.map((tv) => (
-                    <div
-                      key={tv.id}
-                      className="p-3 bg-white rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img src={tv.image} alt={tv.model} className="w-12 h-10 object-cover rounded-lg" />
-                        <div>
-                          <strong className="text-slate-900 text-xs block">{tv.brand} {tv.model} ({tv.plate})</strong>
-                          <span className="text-[10px] text-slate-500">
-                            Transferido a: <strong className="text-blue-700">{tv.ownerEmail}</strong> • Folio: {tv.transferFolio}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedVehicle(tv);
-                          onNavigate('ficha-venta');
-                        }}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
-                      >
-                        Ver Ficha Transferida
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Zero active vehicles message if user transferred all */}
-            {myActiveVehicles.length === 0 && (
+            {/* Vehículos */}
+            {preperitajes.length === 0 && !loading && (
               <div className="p-8 bg-white border border-slate-200 rounded-3xl text-center space-y-3 shadow-sm">
                 <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto">
                   <span className="material-symbols-outlined text-2xl">garage</span>
                 </div>
-                <h3 className="text-base font-bold text-slate-900">No tienes vehículos activos en tu garaje</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Has transferido tu vehículo a su nuevo comprador. El nuevo dueño ahora tiene el control para seguir registrando cambios de aceite y llantas. Puedes registrar un nuevo auto o restablecer el vehículo de demostración para seguir probando.
-                </p>
+                <h3 className="text-base font-bold text-slate-900">Aún no tienes vehículos. Crea tu primer preperitaje</h3>
                 <div className="flex justify-center gap-2 pt-2">
                   <button
                     onClick={() => onNavigate('nuevo-preperitaje')}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow"
                   >
-                    + Registrar Nuevo Preperitaje
-                  </button>
-                  <button
-                    onClick={resetDefaultVehicles}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
-                  >
-                    Restablecer Vehículos Demo
+                    + Nuevo Preperitaje
                   </button>
                 </div>
+              </div>
+            )}
+
+            {preperitajes.length > 0 && (
+              <div className="flex flex-col gap-4">
+                {preperitajes.map((v: any) => (
+                  <article key={v.id} className="group rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all overflow-hidden border border-outline-variant/30">
+                    <div className="p-5 md:p-6 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-1.5 text-label-sm font-label-sm text-outline">
+                            <span>{v.placa}</span>
+                            <span>•</span>
+                            <span>{v.kilometraje ? `${v.kilometraje} km` : 'km N/D'}</span>
+                            <span>•</span>
+                            <span>Modelo {v.anio || 'N/D'}</span>
+                          </div>
+                          <h3 className="font-headline-sm text-headline-sm text-on-surface mt-0.5">
+                            {v.marca || ''} {v.linea || v.modelo || ''}
+                          </h3>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="font-label-sm text-label-sm text-outline">{v.estado === 'completado' ? 'Completado' : 'Borrador'}</span>
+                          {v.estado === 'completado' && (
+                            <button
+                              onClick={() => openReport(v.id)}
+                              className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow"
+                              type="button"
+                            >
+                              Ver Informe
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
               </div>
             )}
 

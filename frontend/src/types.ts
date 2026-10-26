@@ -81,3 +81,71 @@ export interface VehicleInspection {
   photos?: VehiclePhotoRecord[];
   maintenance?: MaintenanceItem[];
 }
+
+export interface PreperitajeFoto {
+  id: string;
+  preperitajeId: string;
+  zona: string;
+  mimeType: string;
+  sizeBytes: number;
+  creadoEn?: string;
+  url: string;
+}
+
+export interface PreperitajeParteInforme {
+  id: string;
+  nombre: string;
+  categoria: string;
+  categoriaEtiqueta: string;
+  condicion: PartCondition | string;
+  condicionEtiqueta: string;
+  observaciones: string;
+  severidad: string;
+}
+
+export interface PreperitajeInforme {
+  aviso: string;
+  generadoPor: 'reglas' | 'gemini';
+  folio: string;
+  fecha: string;
+  usuario: { nombre: string; correo: string };
+  vehiculo: {
+    placa: string;
+    marca: string;
+    linea: string;
+    anio: number | null;
+    kilometraje: number | null;
+    color: string;
+    combustible: string;
+    transmision: string;
+  };
+  partes: PreperitajeParteInforme[];
+  hallazgos: Array<{
+    id: string;
+    nombre: string;
+    categoriaEtiqueta: string;
+    condicion: string;
+    condicionEtiqueta: string;
+    observaciones: string;
+    severidad: string;
+  }>;
+  resumen: {
+    totalPartes: number;
+    partesBuenas: number;
+    partesConProblemas: number;
+    partesConObservaciones: number;
+    porcentajeBuenas: number;
+  };
+  diagnostico: {
+    titulo: string;
+    texto: string;
+    recomendacion: string;
+  };
+  fotos: Array<{
+    id: string;
+    zona: string;
+    zonaEtiqueta: string;
+    url: string;
+    creadoEn?: string;
+  }>;
+}

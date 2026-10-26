@@ -1,16 +1,68 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ScreenId } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { assetUrl } from '../services/api';
 
 interface PerfilScreenProps {
   onNavigate: (screen: ScreenId) => void;
 }
 
 export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
+  const { user, uploadAvatar, removeAvatar } = useAuth();
+  const displayName = user?.name || '';
+  const displayEmail = user?.email || '';
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+  const initials = getInitials(displayName);
   const [activeTab, setActiveTab] = useState<'perfil' | 'seguridad' | 'notificaciones' | 'api'>('perfil');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(true);
   const [pushNotifs, setPushNotifs] = useState<boolean>(true);
   const [emailAlerts, setEmailAlerts] = useState<boolean>(true);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState<boolean>(false);
+  const [avatarFeedback, setAvatarFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setAvatarFeedback({ type: 'error', text: 'Formato no válido. Usa una imagen JPG, PNG o WEBP.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarFeedback({ type: 'error', text: 'La imagen supera el tamaño máximo de 5 MB.' });
+      return;
+    }
+
+    setAvatarUploading(true);
+    setAvatarFeedback(null);
+    const result = await uploadAvatar(file);
+    setAvatarUploading(false);
+    setAvatarFeedback(
+      result.success
+        ? { type: 'success', text: 'Foto de perfil actualizada y guardada en tu cuenta.' }
+        : { type: 'error', text: result.error || 'No se pudo subir la foto de perfil.' }
+    );
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarUploading(true);
+    setAvatarFeedback(null);
+    const result = await removeAvatar();
+    setAvatarUploading(false);
+    setAvatarFeedback(
+      result.success
+        ? { type: 'success', text: 'Foto de perfil eliminada.' }
+        : { type: 'error', text: result.error || 'No se pudo eliminar la foto de perfil.' }
+    );
+  };
 
   const handleSave = () => {
     setSaveSuccess(true);
@@ -24,36 +76,49 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <div className="relative">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80"
-                alt="Lenin Murillo"
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-blue-500 shadow-xl"
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 border-2 border-blue-500 shadow-xl flex items-center justify-center text-white text-lg font-black overflow-hidden">
+                {user?.avatar ? (
+                  <img
+                    src={assetUrl(user.avatar)}
+                    alt={displayName || 'Foto de perfil'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarUploading}
+                aria-label="Actualizar foto de perfil"
+                className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 rounded-full border-2 border-slate-900 flex items-center justify-center transition"
+              >
+                <span className={`material-symbols-outlined text-sm text-white ${avatarUploading ? 'animate-spin' : ''}`}>
+                  {avatarUploading ? 'progress_activity' : 'photo_camera'}
+                </span>
+              </button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleAvatarChange}
               />
-              <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-slate-900 flex items-center justify-center text-[10px] text-white font-bold">
-                ✓
-              </span>
             </div>
 
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-white">Ing. Leni Murillo</h1>
-                <span className="bg-blue-600/30 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-500/40 uppercase tracking-widest">
-                  Ingeniero de Sistemas
-                </span>
+                <h1 className="text-xl sm:text-2xl font-black text-white">{displayName}</h1>
               </div>
               <p className="text-xs text-slate-400 mt-1 font-mono">
-                lenimur03@gmail.com • ID Profesional: UNIMINUTO-SIS-9021
+                {displayEmail}
               </p>
-              <div className="flex items-center gap-4 mt-2 text-xs text-slate-300">
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm text-emerald-400">verified</span>
-                  Profesional en Ing. de Sistemas
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm text-indigo-400">school</span>
-                  Facultad de Ingeniería • UNIMINUTO
-                </span>
-              </div>
+              {avatarFeedback && (
+                <p className={`text-[11px] mt-1 font-semibold ${avatarFeedback.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {avatarFeedback.text}
+                </p>
+              )}
             </div>
           </div>
 
@@ -83,32 +148,28 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Preperitajes Totales
             </span>
-            <span className="text-2xl font-black text-slate-900 mt-1 block">142</span>
-            <span className="text-[10px] text-emerald-600 font-semibold">+18 este mes</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Tasa Aprobación IA
             </span>
-            <span className="text-2xl font-black text-emerald-600 mt-1 block">98.4%</span>
-            <span className="text-[10px] text-slate-500">Alta concordancia</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Tiempo Promedio
             </span>
-            <span className="text-2xl font-black text-blue-600 mt-1 block">3.2m</span>
-            <span className="text-[10px] text-slate-500">Por diagnóstico</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Certificados Emitidos
             </span>
-            <span className="text-2xl font-black text-indigo-600 mt-1 block">128</span>
-            <span className="text-[10px] text-emerald-600 font-semibold">100% SHA-256</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
           </div>
         </div>
 
@@ -172,6 +233,54 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
 
             {activeTab === 'perfil' && (
               <div className="space-y-6 max-w-2xl">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 border border-blue-500 flex items-center justify-center text-white text-sm font-black overflow-hidden shrink-0">
+                    {user?.avatar ? (
+                      <img
+                        src={assetUrl(user.avatar)}
+                        alt={displayName || 'Foto de perfil'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-slate-900">Foto de perfil</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Sube una imagen JPG, PNG o WEBP de máximo 5 MB. Quedará guardada en tu cuenta.
+                    </p>
+                    {avatarFeedback && (
+                      <p className={`text-[11px] mt-1.5 font-semibold ${avatarFeedback.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {avatarFeedback.text}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarUploading}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-xs rounded-lg shadow-md transition flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-base">
+                        {avatarUploading ? 'progress_activity' : 'add_a_photo'}
+                      </span>
+                      {avatarUploading ? 'Subiendo...' : user?.avatar ? 'Cambiar foto' : 'Subir foto'}
+                    </button>
+                    {user?.avatar && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        disabled={avatarUploading}
+                        className="px-3 py-2 bg-white hover:bg-rose-50 disabled:opacity-60 text-rose-600 font-bold text-xs rounded-lg border border-rose-200 transition"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -179,8 +288,9 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
                     </label>
                     <input
                       type="text"
-                      defaultValue="Leni Murillo"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
+                      value={displayName}
+                      readOnly
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900"
                     />
                   </div>
                   <div>
@@ -189,7 +299,7 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
                     </label>
                     <input
                       type="email"
-                      defaultValue="lenimur03@gmail.com"
+                      value={displayEmail}
                       disabled
                       className="w-full bg-slate-100 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-500 cursor-not-allowed"
                     />
@@ -203,7 +313,8 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
                     </label>
                     <input
                       type="text"
-                      defaultValue="Corporación Universitaria Minuto de Dios (UNIMINUTO)"
+                      defaultValue=""
+                      placeholder="Institución / Universidad"
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
                     />
                   </div>
@@ -213,7 +324,8 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
                     </label>
                     <input
                       type="text"
-                      defaultValue="RNT-PER-48291-BOG"
+                      defaultValue=""
+                      placeholder="RNT"
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm font-mono text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
                     />
                   </div>
@@ -224,9 +336,10 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
                     Especialidad Pericial
                   </label>
                   <select
-                    defaultValue="peritaje-ia"
+                    defaultValue=""
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
                   >
+                    <option value="" disabled>Especialidad</option>
                     <option value="peritaje-ia">Inspección Telemática & Visión Computacional</option>
                     <option value="peritaje-mecanico">Diagnóstico Mecánico y Tren Motriz</option>
                     <option value="chasis-estructura">Alineación Estructural y Soldadura Forense</option>
