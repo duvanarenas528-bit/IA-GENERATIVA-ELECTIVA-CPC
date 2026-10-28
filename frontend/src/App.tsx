@@ -26,7 +26,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { reportIdFromPath, resetAppPath } from './services/navigation';
 
 function AppContent() {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const initialReportId = reportIdFromPath();
   const [reportId, setReportId] = useState<string | null>(initialReportId);
   const [currentScreen, setCurrentScreen] = useState<ScreenId>(
@@ -39,10 +40,10 @@ function AppContent() {
         setCurrentScreen('login-user');
       }
       if (isAuthenticated && currentScreen.startsWith('login')) {
-        setCurrentScreen('dashboard');
+        setCurrentScreen(isAdmin ? 'admin-dashboard' : 'dashboard');
       }
     }
-  }, [isAuthenticated, loading]);
+  }, [isAuthenticated, loading, isAdmin]);
 
   useEffect(() => {
     const syncFromPath = () => {
@@ -79,6 +80,18 @@ function AppContent() {
       setCurrentScreen('login-user');
       return;
     }
+
+    if (isAuthenticated && screen.startsWith('login')) {
+      setCurrentScreen(isAdmin ? 'admin-dashboard' : 'dashboard');
+      return;
+    }
+
+    const adminScreens: ScreenId[] = ['admin-dashboard', 'admin-auditoria', 'admin-metricas'];
+    if (adminScreens.includes(screen) && !isAdmin) {
+      setCurrentScreen('dashboard');
+      return;
+    }
+
     const keepReport = ['informe-detallado', 'ficha-venta', 'visor-a4'].includes(screen);
     resetAppPath();
     if (!keepReport) setReportId(null);
@@ -150,15 +163,15 @@ function AppContent() {
           <PerfilScreen onNavigate={handleNavigate} />
         )}
 
-        {currentScreen === 'admin-dashboard' && isAuthenticated && (
+        {currentScreen === 'admin-dashboard' && isAuthenticated && isAdmin && (
           <AdminDashboardScreen onNavigate={handleNavigate} />
         )}
 
-        {currentScreen === 'admin-auditoria' && isAuthenticated && (
+        {currentScreen === 'admin-auditoria' && isAuthenticated && isAdmin && (
           <AdminAuditoriaScreen onNavigate={handleNavigate} />
         )}
 
-        {currentScreen === 'admin-metricas' && isAuthenticated && (
+        {currentScreen === 'admin-metricas' && isAuthenticated && isAdmin && (
           <AdminMetricasScreen onNavigate={handleNavigate} />
         )}
 

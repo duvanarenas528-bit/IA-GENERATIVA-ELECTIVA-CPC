@@ -24,6 +24,43 @@ export interface UserAccount {
   licenseNumber?: string;
 }
 
+export interface AdminRecentPreperitaje {
+  id: string;
+  placa: string;
+  marca?: string | null;
+  linea?: string | null;
+  anio?: number | null;
+  kilometraje?: number | null;
+  color?: string | null;
+  combustible?: string | null;
+  transmision?: string | null;
+  estado: 'borrador' | 'completado';
+  creado_en?: string;
+  actualizado_en?: string;
+  usuario: { nombre: string; correo: string };
+  fotoPrincipalUrl: string | null;
+  fotoPrincipalEtiqueta: string | null;
+  totalPartes: number;
+  partesBuenas: number;
+  hallazgos: number;
+  score: number;
+  riesgo: 'bajo' | 'medio' | 'alto';
+}
+
+export interface AdminOverview {
+  stats: {
+    usuarios: number;
+    total: number;
+    completados: number;
+    borradores: number;
+    ultimas24h: number;
+    ultimos7dias: number;
+    fotos: number;
+    conHallazgos: number;
+  };
+  recientes: AdminRecentPreperitaje[];
+}
+
 export type PartCondition = 
   | 'good'          // En buen estado / Original
   | 'scratches'     // Rayones leves superficiales

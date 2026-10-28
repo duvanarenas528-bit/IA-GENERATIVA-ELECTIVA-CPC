@@ -36,7 +36,7 @@ export async function clearRateLimit(correo: string, ip: string) {
 export async function createUser(nombre: string, correo: string, password: string) {
   const password_hash = await argon2.hash(password);
   const result = await pool.query(
-    'INSERT INTO users (nombre, correo, password_hash) VALUES ($1, $2, $3) RETURNING id, nombre, correo, creado_en',
+    'INSERT INTO users (nombre, correo, password_hash) VALUES ($1, $2, $3) RETURNING id, nombre, correo, role, creado_en',
     [nombre, correo.toLowerCase(), password_hash]
   );
   return result.rows[0];

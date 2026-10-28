@@ -30,7 +30,7 @@ function toUserAccount(u: any): UserAccount {
     name: u.nombre || u.name,
     email: u.correo || u.email,
     avatar: u.avatar || undefined,
-    role: 'user',
+    role: u.role === 'admin' || u.role === 'perito' ? u.role : 'user',
     authProvider: 'local',
   };
 }

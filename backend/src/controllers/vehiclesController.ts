@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.js';
 import { pool } from '../db/pool.js';
 import { generatePreperitajeReport } from '../services/gemini.js';
+import { ZONE_LABELS } from '../services/preperitajeReport.js';
 
 function toJsonParam(value: any) {
   if (value === null || value === undefined) return null;
@@ -42,8 +43,41 @@ export async function createPreperitaje(req: AuthRequest, res: Response) {
 export async function listPreperitajes(req: AuthRequest, res: Response) {
   try {
     const userId = req.user?.id;
-    const result = await pool.query('SELECT * FROM preperitajes WHERE user_id = $1 ORDER BY creado_en DESC', [userId]);
-    return res.json({ preperitajes: result.rows });
+    const result = await pool.query(
+      `SELECT p.*, f.id AS foto_principal_id, f.zona AS foto_principal_zona
+         FROM preperitajes p
+         LEFT JOIN LATERAL (
+           SELECT id, zona
+             FROM preperitaje_fotos
+            WHERE preperitaje_id = p.id AND user_id = p.user_id
+            ORDER BY CASE zona
+                       WHEN 'frontal' THEN 0
+                       WHEN 'lateral' THEN 1
+                       WHEN 'trasera' THEN 2
+                       ELSE 3
+                     END,
+                     creado_en ASC
+            LIMIT 1
+         ) f ON true
+        WHERE p.user_id = $1
+        ORDER BY p.creado_en DESC`,
+      [userId]
+    );
+
+    const preperitajes = result.rows.map((row) => {
+      const { foto_principal_id, foto_principal_zona, ...preperitaje } = row;
+      return {
+        ...preperitaje,
+        fotoPrincipalUrl: foto_principal_id
+          ? `/api/preperitajes/${row.id}/fotos/${foto_principal_id}/archivo`
+          : null,
+        fotoPrincipalEtiqueta: foto_principal_zona
+          ? ZONE_LABELS[foto_principal_zona] || foto_principal_zona
+          : null,
+      };
+    });
+
+    return res.json({ preperitajes });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Error interno' });
