@@ -114,12 +114,15 @@ export async function getPreperitajeFotoArchivo(req: AuthRequest, res: Response)
       return res.status(404).json({ error: 'Foto no encontrada.' });
     }
 
+    const isAdmin = req.user?.role === 'admin';
+
     const result = await pool.query(
       `SELECT f.filename, f.mime_type
          FROM preperitaje_fotos f
          JOIN preperitajes p ON p.id = f.preperitaje_id
-        WHERE f.id = $1 AND f.preperitaje_id = $2 AND p.user_id = $3 AND f.user_id = $3`,
-      [fotoId, id, userId]
+        WHERE f.id = $1 AND f.preperitaje_id = $2
+          AND ($3::boolean OR (p.user_id = $4 AND f.user_id = $4))`,
+      [fotoId, id, isAdmin, userId]
     );
 
     if (result.rows.length === 0) {
@@ -149,15 +152,20 @@ export async function getPreperitajeInforme(req: AuthRequest, res: Response) {
       return res.status(404).json({ error: 'Preperitaje no encontrado.' });
     }
 
-    const preperitaje = await pool.query('SELECT * FROM preperitajes WHERE id = $1 AND user_id = $2', [id, userId]);
+    const isAdmin = req.user?.role === 'admin';
+    const preperitaje = await pool.query(
+      'SELECT * FROM preperitajes WHERE id = $1 AND ($2::boolean OR user_id = $3)',
+      [id, isAdmin, userId]
+    );
     if (preperitaje.rows.length === 0) {
       return res.status(404).json({ error: 'Preperitaje no encontrado.' });
     }
 
-    const usuario = await pool.query('SELECT nombre, correo FROM users WHERE id = $1', [userId]);
+    const ownerId = preperitaje.rows[0].user_id;
+    const usuario = await pool.query('SELECT nombre, correo FROM users WHERE id = $1', [ownerId]);
     const fotos = await pool.query(
       'SELECT * FROM preperitaje_fotos WHERE preperitaje_id = $1 AND user_id = $2 ORDER BY creado_en ASC',
-      [id, userId]
+      [id, ownerId]
     );
 
     const informe = buildPreperitajeReport(

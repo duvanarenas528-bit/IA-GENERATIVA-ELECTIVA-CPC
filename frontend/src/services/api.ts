@@ -201,3 +201,10 @@ export async function getDashboardStats() {
   if (!res.ok) return { stats: { total: 0, completados: 0, conObservaciones: 0, alertas: 0 } };
   return json;
 }
+
+export async function getAdminOverview() {
+  const res = await api.get('/admin/overview');
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'Error al cargar el panel administrativo');
+  return json;
+}

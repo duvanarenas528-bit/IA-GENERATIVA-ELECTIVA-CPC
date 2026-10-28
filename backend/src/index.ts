@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import vehiclesRouter, { reportsRouter } from './routes/vehicles.js';
 import preperitajesRouter from './routes/preperitajes.js';
+import adminRouter from './routes/admin.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/preperitajes', preperitajesRouter);
+app.use('/api/admin', adminRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);

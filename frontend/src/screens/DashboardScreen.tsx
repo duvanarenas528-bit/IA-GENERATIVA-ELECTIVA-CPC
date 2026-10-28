@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScreenId } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { getDashboardStats, listPreperitajes } from '../services/api';
+import { assetUrl, getDashboardStats, listPreperitajes } from '../services/api';
 import { openReport } from '../services/navigation';
 
 interface DashboardScreenProps {
@@ -217,29 +217,88 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               <div className="flex flex-col gap-4">
                 {preperitajes.map((v: any) => (
                   <article key={v.id} className="group rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all overflow-hidden border border-outline-variant/30">
-                    <div className="p-5 md:p-6 flex flex-col gap-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-1.5 text-label-sm font-label-sm text-outline">
-                            <span>{v.placa}</span>
-                            <span>•</span>
-                            <span>{v.kilometraje ? `${v.kilometraje} km` : 'km N/D'}</span>
-                            <span>•</span>
-                            <span>Modelo {v.anio || 'N/D'}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-12">
+                      <div className="relative sm:col-span-4 h-44 sm:h-auto min-h-[180px] bg-slate-100 overflow-hidden">
+                        {v.fotoPrincipalUrl ? (
+                          <img
+                            src={assetUrl(v.fotoPrincipalUrl)}
+                            alt={`${v.marca || ''} ${v.linea || v.modelo || ''} ${v.placa || ''}`.trim()}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full min-h-[180px] flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                            <span className="material-symbols-outlined text-4xl">directions_car</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider">Sin foto registrada</span>
                           </div>
-                          <h3 className="font-headline-sm text-headline-sm text-on-surface mt-0.5">
-                            {v.marca || ''} {v.linea || v.modelo || ''}
-                          </h3>
+                        )}
+
+                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-slate-900/80 backdrop-blur-md text-white font-label-sm text-label-sm uppercase tracking-wider">
+                          {v.placa}
                         </div>
-                        <div className="flex flex-col items-end">
-                          <span className="font-label-sm text-label-sm text-outline">{v.estado === 'completado' ? 'Completado' : 'Borrador'}</span>
+
+                        {v.fotoPrincipalEtiqueta && (
+                          <div className="absolute bottom-2 left-2 right-2 px-2 py-1 rounded bg-slate-900/70 backdrop-blur text-white text-[10px] font-semibold truncate">
+                            {v.fotoPrincipalEtiqueta}
+                          </div>
+                        )}
+
+                        {v.estado === 'completado' && (
+                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow">
+                            <span className="material-symbols-outlined text-[14px]">check</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="sm:col-span-8 p-5 md:p-6 flex flex-col justify-between gap-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap text-label-sm font-label-sm text-outline">
+                              <span>{v.kilometraje ? `${v.kilometraje} km` : 'km N/D'}</span>
+                              <span>•</span>
+                              <span>Modelo {v.anio || 'N/D'}</span>
+                              {v.combustible && (
+                                <>
+                                  <span>•</span>
+                                  <span className="capitalize">{v.combustible}</span>
+                                </>
+                              )}
+                            </div>
+                            <h3 className="font-headline-sm text-headline-sm text-on-surface mt-0.5 truncate">
+                              {v.marca || ''} {v.linea || v.modelo || ''}
+                            </h3>
+                            {v.color && (
+                              <p className="font-body-sm text-body-sm text-outline mt-1 capitalize">Color {v.color}</p>
+                            )}
+                          </div>
+
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-label-sm text-label-sm font-bold shrink-0 ${
+                              v.estado === 'completado'
+                                ? 'bg-tertiary-fixed/40 text-tertiary'
+                                : 'bg-surface-container-high text-on-surface-variant'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[14px]">
+                              {v.estado === 'completado' ? 'task_alt' : 'edit_note'}
+                            </span>
+                            {v.estado === 'completado' ? 'Completado' : 'Borrador'}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-outline-variant/30">
+                          <span className="font-body-sm text-body-sm text-outline">
+                            {v.fotoPrincipalUrl
+                              ? 'Evidencia fotográfica del preperitaje disponible'
+                              : 'Este preperitaje aún no tiene fotos registradas'}
+                          </span>
                           {v.estado === 'completado' && (
                             <button
                               onClick={() => openReport(v.id)}
-                              className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow"
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg transition-colors shadow-sm cursor-pointer"
                               type="button"
                             >
-                              Ver Informe
+                              <span>Ver Informe</span>
+                              <span className="material-symbols-outlined text-label-lg">arrow_forward</span>
                             </button>
                           )}
                         </div>

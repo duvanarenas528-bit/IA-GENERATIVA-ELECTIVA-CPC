@@ -17,6 +17,7 @@ function serializeUser(row: any) {
     id: row.id,
     nombre: row.nombre,
     correo: row.correo,
+    role: row.role || 'user',
     creado_en: row.creado_en,
     avatar: row.avatar_filename ? `/api/auth/avatar?v=${updatedAt}` : null,
   };
@@ -57,7 +58,7 @@ export async function register(req: Request, res: Response) {
       return res.status(400).json({ error: 'No se pudo registrar con esos datos' });
     }
     const user = await createUser(nombre, correo, password);
-    const accessToken = generateAccessToken({ id: user.id, correo: user.correo, nombre: user.nombre });
+    const accessToken = generateAccessToken({ id: user.id, correo: user.correo, nombre: user.nombre, role: user.role || 'user' });
     const refreshToken = generateRefreshToken({ id: user.id });
     await redis.set(`refresh:${user.id}:${refreshToken}`, 'valid', 'EX', 7 * 24 * 60 * 60);
     setAuthCookies(res, accessToken, refreshToken);
@@ -91,7 +92,7 @@ export async function login(req: Request, res: Response) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
     await clearRateLimit(correo, ip);
-    const accessToken = generateAccessToken({ id: user.id, correo: user.correo, nombre: user.nombre });
+    const accessToken = generateAccessToken({ id: user.id, correo: user.correo, nombre: user.nombre, role: user.role || 'user' });
     const refreshToken = generateRefreshToken({ id: user.id });
     await redis.set(`refresh:${user.id}:${refreshToken}`, 'valid', 'EX', 7 * 24 * 60 * 60);
     setAuthCookies(res, accessToken, refreshToken);
@@ -128,12 +129,12 @@ export async function refresh(req: Request, res: Response) {
     const exists = await redis.get(`refresh:${payload.id}:${refreshToken}`);
     if (!exists) return res.status(401).json({ error: 'No autorizado' });
     const user = await pool.query(
-      'SELECT id, nombre, correo, creado_en, avatar_filename, avatar_actualizado_en FROM users WHERE id = $1',
+      'SELECT id, nombre, correo, role, creado_en, avatar_filename, avatar_actualizado_en FROM users WHERE id = $1',
       [payload.id]
     );
     if (user.rows.length === 0) return res.status(401).json({ error: 'No autorizado' });
     const u = user.rows[0];
-    const accessToken = generateAccessToken({ id: u.id, correo: u.correo, nombre: u.nombre });
+    const accessToken = generateAccessToken({ id: u.id, correo: u.correo, nombre: u.nombre, role: u.role || 'user' });
     res.cookie('access_token', accessToken, {
       httpOnly: true,
       sameSite: 'lax',
@@ -153,7 +154,7 @@ export async function me(req: AuthRequest, res: Response) {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'No autorizado' });
     const result = await pool.query(
-      'SELECT id, nombre, correo, creado_en, avatar_filename, avatar_actualizado_en FROM users WHERE id = $1',
+      'SELECT id, nombre, correo, role, creado_en, avatar_filename, avatar_actualizado_en FROM users WHERE id = $1',
       [userId]
     );
     if (result.rows.length === 0) return res.status(401).json({ error: 'No autorizado' });
@@ -185,7 +186,7 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
               avatar_mime_type = $2,
               avatar_actualizado_en = NOW()
         WHERE id = $3
-        RETURNING id, nombre, correo, creado_en, avatar_filename, avatar_actualizado_en`,
+        RETURNING id, nombre, correo, role, creado_en, avatar_filename, avatar_actualizado_en`,
       [file.filename, file.mimetype, userId]
     );
 
@@ -244,7 +245,7 @@ export async function deleteAvatar(req: AuthRequest, res: Response) {
               avatar_mime_type = NULL,
               avatar_actualizado_en = NOW()
         WHERE id = $1
-        RETURNING id, nombre, correo, creado_en, avatar_filename, avatar_actualizado_en`,
+        RETURNING id, nombre, correo, role, creado_en, avatar_filename, avatar_actualizado_en`,
       [userId]
     );
 
