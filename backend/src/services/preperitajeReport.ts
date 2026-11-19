@@ -1,11 +1,4 @@
-const CONDITION_LABELS: Record<string, string> = {
-  good: 'En buen estado / Original',
-  scratches: 'Rayones leves superficiales',
-  dents: 'Golpes / Abolladuras',
-  repainted: 'Repintado / Descolorido',
-  broken: 'Pieza rota o faltante',
-  'not-applicable': 'No aplica',
-};
+import { conditionLabel, isGoodCondition } from './questionnaireCatalog.js';
 
 const CATEGORY_LABELS: Record<string, string> = {
   exterior: 'Carrocería y pintura',
@@ -52,6 +45,9 @@ type RawPreperitaje = {
   combustible?: string | null;
   transmision?: string | null;
   respuestas?: unknown;
+  mantenimiento?: unknown;
+  analisis_ia?: unknown;
+  analisis_cuestionario?: unknown;
   estado?: string;
   creado_en?: string;
   actualizado_en?: string;
@@ -72,6 +68,85 @@ function normalizeParts(value: unknown): RawPart[] {
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function nullableText(value: unknown): string | null {
+  return cleanText(value) || null;
+}
+
+function dateString(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10) || null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  return null;
+}
+
+function nonNegativeNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.round(number) : null;
+}
+
+function buildMantenimiento(value: unknown, kilometrajeActual: number | null) {
+  const raw = parseAnalisisJson(value) || {};
+  const ultimoCambioAceiteFecha = dateString(
+    raw.ultimoCambioAceiteFecha ?? raw.ultimo_cambio_aceite_fecha
+  );
+  const ultimoCambioAceiteKm = nonNegativeNumber(
+    raw.ultimoCambioAceiteKm ?? raw.ultimo_cambio_aceite_km
+  );
+  const ultimoCambioAceiteTaller = nullableText(
+    raw.ultimoCambioAceiteTaller ?? raw.ultimo_cambio_aceite_taller
+  );
+  const ultimoMantenimientoFecha = dateString(
+    raw.ultimoMantenimientoFecha ?? raw.ultimo_mantenimiento_fecha
+  );
+  const ultimoMantenimientoDescripcion = nullableText(
+    raw.ultimoMantenimientoDescripcion ?? raw.ultimo_mantenimiento_descripcion
+  );
+  const ultimoMantenimientoTaller = nullableText(
+    raw.ultimoMantenimientoTaller ?? raw.ultimo_mantenimiento_taller
+  );
+
+  const kmDesdeCambioAceite =
+    kilometrajeActual !== null &&
+    ultimoCambioAceiteKm !== null &&
+    kilometrajeActual >= ultimoCambioAceiteKm
+      ? kilometrajeActual - ultimoCambioAceiteKm
+      : null;
+
+  return {
+    ultimoCambioAceiteFecha,
+    ultimoCambioAceiteKm,
+    ultimoCambioAceiteTaller,
+    ultimoMantenimientoFecha,
+    ultimoMantenimientoDescripcion,
+    ultimoMantenimientoTaller,
+    kmDesdeCambioAceite,
+    proximoCambioAceiteReferencia:
+      ultimoCambioAceiteKm !== null ? ultimoCambioAceiteKm + 5000 : null,
+    tieneInformacion: !!(
+      ultimoCambioAceiteFecha ||
+      ultimoCambioAceiteKm !== null ||
+      ultimoCambioAceiteTaller ||
+      ultimoMantenimientoFecha ||
+      ultimoMantenimientoDescripcion ||
+      ultimoMantenimientoTaller
+    ),
+  };
+}
+
+function parseAnalisisJson(value: unknown): Record<string, any> | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'object') return value as Record<string, any>;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 export interface PreperitajeReport {
@@ -121,6 +196,19 @@ export interface PreperitajeReport {
     texto: string;
     recomendacion: string;
   };
+  mantenimiento: {
+    ultimoCambioAceiteFecha: string | null;
+    ultimoCambioAceiteKm: number | null;
+    ultimoCambioAceiteTaller: string | null;
+    ultimoMantenimientoFecha: string | null;
+    ultimoMantenimientoDescripcion: string | null;
+    ultimoMantenimientoTaller: string | null;
+    kmDesdeCambioAceite: number | null;
+    proximoCambioAceiteReferencia: number | null;
+    tieneInformacion: boolean;
+  };
+  analisisIA?: Record<string, any> | null;
+  analisisCuestionario?: Record<string, any> | null;
   fotos: Array<{
     id: string;
     zona: string;
@@ -145,15 +233,15 @@ export function buildPreperitajeReport(
       categoria: part.category || 'exterior',
       categoriaEtiqueta: CATEGORY_LABELS[part.category || 'exterior'] || 'General',
       condicion,
-      condicionEtiqueta: CONDITION_LABELS[condicion] || condicion,
+      condicionEtiqueta: conditionLabel(part.id, condicion),
       observaciones,
       severidad: part.severity || 'optima',
     };
   });
 
-  const partesBuenas = mapped.filter((p) => p.condicion === 'good').length;
+  const partesBuenas = mapped.filter((p) => isGoodCondition(p.condicion)).length;
   const hallazgos = mapped.filter(
-    (p) => p.condicion !== 'good' && p.condicion !== 'not-applicable'
+    (p) => !isGoodCondition(p.condicion) && p.condicion !== 'not-applicable'
   );
   const partesConObservaciones = mapped.filter((p) => p.observaciones.length > 0).length;
   const totalPartes = mapped.length;
@@ -230,6 +318,16 @@ export function buildPreperitajeReport(
       texto,
       recomendacion,
     },
+    mantenimiento: buildMantenimiento(
+      preperitaje.mantenimiento,
+      typeof preperitaje.kilometraje === 'number' ? preperitaje.kilometraje : null
+    ),
+    ...(parseAnalisisJson(preperitaje.analisis_ia)
+      ? { analisisIA: parseAnalisisJson(preperitaje.analisis_ia) }
+      : {}),
+    ...(parseAnalisisJson(preperitaje.analisis_cuestionario)
+      ? { analisisCuestionario: parseAnalisisJson(preperitaje.analisis_cuestionario) }
+      : {}),
     fotos: fotos.map((foto) => ({
       id: foto.id,
       zona: foto.zona,

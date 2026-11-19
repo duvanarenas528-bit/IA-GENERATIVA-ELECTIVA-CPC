@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { PreperitajeInforme, PreperitajeParteInforme, ScreenId } from '../types';
-import { assetUrl, getPreperitajeInforme, listPreperitajes } from '../services/api';
+import { isGoodCondition } from '../constants/questionnaire';
+import {
+  analizarCuestionarioIA,
+  analizarFotosIA,
+  assetUrl,
+  getPreperitajeInforme,
+  listPreperitajes,
+} from '../services/api';
 
 interface InformeDetalladoScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -16,6 +23,12 @@ const FILTER_LABELS: { id: ComponentFilter; label: string }[] = [
   { id: 'frenos', label: 'Llantas & Frenos' },
   { id: 'interior', label: 'Interior & Cabina' },
 ];
+
+const PRIORIDAD_CLASES: Record<string, string> = {
+  alta: 'bg-red-500/20 text-red-200',
+  media: 'bg-amber-500/20 text-amber-200',
+  baja: 'bg-emerald-500/20 text-emerald-200',
+};
 
 function formatDate(value?: string) {
   if (!value) return 'Sin fecha registrada';
@@ -33,6 +46,15 @@ function formatDate(value?: string) {
 function formatNumber(value?: number | null) {
   if (value === null || value === undefined) return 'N/D';
   return value.toLocaleString('es-CO');
+}
+
+function formatMoney(value?: number | null, currency = 'COP') {
+  if (value === null || value === undefined) return 'N/D';
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function filterForPart(part: PreperitajeParteInforme): ComponentFilter {
@@ -62,7 +84,7 @@ function iconForPart(part: PreperitajeParteInforme) {
 }
 
 function statusBadge(part: PreperitajeParteInforme) {
-  if (part.condicion === 'good') {
+  if (isGoodCondition(part.condicion)) {
     return {
       label: 'Óptimo',
       dot: 'bg-tertiary',
@@ -76,7 +98,7 @@ function statusBadge(part: PreperitajeParteInforme) {
       classes: 'bg-surface-container-high text-on-surface-variant',
     };
   }
-  if (part.condicion === 'dents' || part.condicion === 'broken') {
+  if (part.severidad === 'alta' || part.condicion === 'dents' || part.condicion === 'broken') {
     return {
       label: part.condicionEtiqueta,
       dot: 'bg-error',
@@ -98,8 +120,13 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [informe, setInforme] = useState<PreperitajeInforme | null>(null);
+  const [activeId, setActiveId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
+  const [analyzingCuestionario, setAnalyzingCuestionario] = useState(false);
+  const [cuestionarioError, setCuestionarioError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -119,6 +146,7 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
           if (active) setError('Aún no tienes informes. Crea un preperitaje y genera tu informe.');
           return;
         }
+        if (active) setActiveId(id);
         const data = await getPreperitajeInforme(id);
         if (active) setInforme(data.informe);
       } catch (e: any) {
@@ -145,6 +173,34 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
       setDownloading(false);
       window.print();
     }, 1200);
+  };
+
+  const handleAnalyze = async () => {
+    if (!activeId || analyzing) return;
+    setAnalyzing(true);
+    setAnalysisError('');
+    try {
+      const analisis = await analizarFotosIA(activeId);
+      setInforme((prev) => (prev ? { ...prev, analisisIA: analisis } : prev));
+    } catch (e: any) {
+      setAnalysisError(e.message || 'No se pudo analizar las fotos con IA.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleAnalyzeCuestionario = async () => {
+    if (!activeId || analyzingCuestionario) return;
+    setAnalyzingCuestionario(true);
+    setCuestionarioError('');
+    try {
+      const analisis = await analizarCuestionarioIA(activeId);
+      setInforme((prev) => (prev ? { ...prev, analisisCuestionario: analisis } : prev));
+    } catch (e: any) {
+      setCuestionarioError(e.message || 'No se pudo analizar el cuestionario con IA.');
+    } finally {
+      setAnalyzingCuestionario(false);
+    }
   };
 
   if (loading) {
@@ -181,6 +237,8 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
   const porcentaje = resumen.porcentajeBuenas;
   const gaugeOffset = 364.4 * (1 - porcentaje / 100);
   const noAplicables = informe.partes.filter((p) => p.condicion === 'not-applicable').length;
+  const hayComentarios = informe.partes.some((p) => p.observaciones?.trim());
+  const usaIA = !!informe.analisisIA || !!informe.analisisCuestionario;
   const partesFiltradas =
     componentFilter === 'all'
       ? informe.partes
@@ -230,8 +288,12 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-outline-variant/30 mb-6">
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm uppercase tracking-wider font-bold">
-                Diagnóstico de prueba, sin IA
+              <span className={`px-2.5 py-0.5 rounded font-label-sm text-label-sm uppercase tracking-wider font-bold ${
+                usaIA
+                  ? 'bg-blue-100 text-blue-900'
+                  : 'bg-tertiary-fixed text-on-tertiary-fixed'
+              }`}>
+                {usaIA ? 'Análisis IA Gemini' : 'Diagnóstico de prueba, sin IA'}
               </span>
               <span className="text-outline font-label-sm text-label-sm">•</span>
               <span className="text-outline font-label-sm text-label-sm uppercase font-mono">Folio: {informe.folio}</span>
@@ -248,6 +310,30 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing || fotos.length === 0}
+              title={fotos.length === 0 ? 'Sube al menos una foto para analizar' : undefined}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-label-lg text-label-lg transition-all shadow-md cursor-pointer"
+              type="button"
+            >
+              <span className={`material-symbols-outlined text-label-lg ${analyzing ? 'animate-spin' : ''}`}>
+                {analyzing ? 'progress_activity' : 'auto_awesome'}
+              </span>
+              <span>{analyzing ? 'Analizando fotos...' : 'Analizar fotos con IA'}</span>
+            </button>
+            <button
+              onClick={handleAnalyzeCuestionario}
+              disabled={analyzingCuestionario || !hayComentarios}
+              title={!hayComentarios ? 'Agrega comentarios en el cuestionario para analizarlos' : undefined}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-label-lg text-label-lg transition-all shadow-md cursor-pointer"
+              type="button"
+            >
+              <span className={`material-symbols-outlined text-label-lg ${analyzingCuestionario ? 'animate-spin' : ''}`}>
+                {analyzingCuestionario ? 'progress_activity' : 'psychology'}
+              </span>
+              <span>{analyzingCuestionario ? 'Analizando comentarios...' : 'Analizar comentarios del cuestionario'}</span>
+            </button>
             <button
               onClick={handleShare}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-lg text-label-lg transition-all shadow-sm cursor-pointer border border-outline-variant/30"
@@ -296,10 +382,281 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
               </span>
             </div>
             <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed mt-1">
-              Este informe se construye con reglas simples a partir de las respuestas y fotografías que registraste. No utiliza inteligencia artificial todavía y no constituye una certificación técnica oficial ni reemplaza un peritaje profesional presencial.
+              {usaIA
+                ? 'Este informe combina las reglas del cuestionario con análisis orientativos generados por Gemini sobre las fotografías y/o los comentarios registrados. No constituye una certificación técnica oficial ni reemplaza un peritaje profesional presencial.'
+                : 'Este informe se construye con reglas simples a partir de las respuestas y fotografías que registraste. No utiliza inteligencia artificial todavía y no constituye una certificación técnica oficial ni reemplaza un peritaje profesional presencial.'}
             </p>
           </div>
         </div>
+
+        {analysisError && (
+          <div className="w-full mb-6 p-4 rounded-xl bg-error-container text-error font-body-md text-body-md border border-error/30">
+            {analysisError}
+          </div>
+        )}
+
+        {cuestionarioError && (
+          <div className="w-full mb-6 p-4 rounded-xl bg-error-container text-error font-body-md text-body-md border border-error/30">
+            {cuestionarioError}
+          </div>
+        )}
+
+        {informe.mantenimiento?.tieneInformacion && (
+          <section className="w-full bg-white rounded-2xl p-6 shadow-md mb-8 border border-emerald-100">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700">
+                  <span className="material-symbols-outlined">history</span>
+                </div>
+                <div>
+                  <h2 className="font-headline-sm text-headline-sm font-bold text-slate-900">
+                    Historial de mantenimiento declarado
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Visible para el nuevo propietario después del traspaso.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-2">
+                <h3 className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">oil_barrel</span>
+                  Último cambio de aceite
+                </h3>
+                <p className="text-xs text-slate-700">
+                  <strong>Fecha:</strong> {formatDate(informe.mantenimiento.ultimoCambioAceiteFecha || undefined)}
+                </p>
+                <p className="text-xs text-slate-700">
+                  <strong>Kilometraje al cambio:</strong>{' '}
+                  {informe.mantenimiento.ultimoCambioAceiteKm !== null
+                    ? `${informe.mantenimiento.ultimoCambioAceiteKm.toLocaleString('es-CO')} km`
+                    : 'No indicado'}
+                </p>
+                <p className="text-xs text-slate-700">
+                  <strong>Km recorridos desde el cambio:</strong>{' '}
+                  {informe.mantenimiento.kmDesdeCambioAceite !== null
+                    ? `+${informe.mantenimiento.kmDesdeCambioAceite.toLocaleString('es-CO')} km`
+                    : 'No computable'}
+                </p>
+                <p className="text-xs text-slate-700">
+                  <strong>Taller:</strong> {informe.mantenimiento.ultimoCambioAceiteTaller || 'No indicado'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-2">
+                <h3 className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">build</span>
+                  Último mantenimiento
+                </h3>
+                <p className="text-xs text-slate-700">
+                  <strong>Fecha:</strong> {formatDate(informe.mantenimiento.ultimoMantenimientoFecha || undefined)}
+                </p>
+                <p className="text-xs text-slate-700">
+                  <strong>Taller:</strong> {informe.mantenimiento.ultimoMantenimientoTaller || 'No indicado'}
+                </p>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {informe.mantenimiento.ultimoMantenimientoDescripcion || 'Sin detalle registrado.'}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {informe.analisisIA && (
+          <section className="w-full bg-gradient-to-br from-slate-900 to-indigo-950 text-slate-100 rounded-2xl p-6 shadow-md mb-8 border border-indigo-800/60">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-300">
+                  <span className="material-symbols-outlined">auto_awesome</span>
+                </div>
+                <div>
+                  <h2 className="font-headline-sm text-headline-sm font-bold">Análisis visual con IA</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {informe.analisisIA.fotosAnalizadas || informe.fotos.length} fotos analizadas
+                    {informe.analisisIA.modelo ? ` · ${informe.analisisIA.modelo}` : ''}
+                    {informe.analisisIA.generadoEn ? ` · ${formatDate(informe.analisisIA.generadoEn)}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleAnalyze}
+                disabled={analyzing}
+                className="px-3.5 py-2 rounded-lg border border-white/20 text-xs font-bold text-slate-200 hover:bg-white/10 disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-sm">refresh</span>
+                Actualizar análisis
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-4 rounded-xl bg-white/5 border border-white/10 p-5">
+                <span className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Rango de valor estimado</span>
+                <p className="text-2xl font-black text-emerald-300 mt-2 leading-tight">
+                  {formatMoney(informe.analisisIA.valoracion.min, informe.analisisIA.valoracion.moneda)} –{' '}
+                  {formatMoney(informe.analisisIA.valoracion.max, informe.analisisIA.valoracion.moneda)}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                  {informe.analisisIA.aviso || 'Valoración orientativa generada por IA.'}
+                </p>
+                {informe.analisisIA.valoracion.factores && informe.analisisIA.valoracion.factores.length > 0 && (
+                  <div className="mt-4">
+                    <span className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Factores</span>
+                    <ul className="mt-2 space-y-1.5">
+                      {informe.analisisIA.valoracion.factores.map((factor, index) => (
+                        <li key={index} className="text-xs text-slate-300 flex items-start gap-2">
+                          <span className="material-symbols-outlined text-sm text-blue-300">chevron_right</span>
+                          <span>{factor}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-8 space-y-5">
+                <div>
+                  <h3 className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Estado general</h3>
+                  <p className="text-sm text-slate-200 leading-relaxed">{informe.analisisIA.estado_general}</p>
+                </div>
+
+                {informe.analisisIA.hallazgos.length > 0 && (
+                  <div>
+                    <h3 className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Hallazgos visuales</h3>
+                    <div className="space-y-2">
+                      {informe.analisisIA.hallazgos.map((hallazgo, index) => (
+                        <div key={index} className="rounded-lg bg-white/5 border border-white/10 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-white">{hallazgo.titulo}</p>
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-200">
+                              {hallazgo.severidad || 'sin severidad'}
+                            </span>
+                          </div>
+                          {hallazgo.detalle && <p className="text-xs text-slate-400 mt-1">{hallazgo.detalle}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {informe.analisisIA.recomendaciones.length > 0 && (
+                  <div>
+                    <h3 className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Recomendaciones</h3>
+                    <ul className="space-y-1.5">
+                      {informe.analisisIA.recomendaciones.map((recomendacion, index) => (
+                        <li key={index} className="text-xs text-slate-300 flex items-start gap-2">
+                          <span className="material-symbols-outlined text-sm text-emerald-300">check_circle</span>
+                          <span>{recomendacion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {informe.analisisCuestionario && (
+          <section className="w-full bg-white rounded-2xl p-6 shadow-md mb-8 border border-indigo-100">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700">
+                  <span className="material-symbols-outlined">forum</span>
+                </div>
+                <div>
+                  <h2 className="font-headline-sm text-headline-sm font-bold text-slate-900">
+                    Orientación de IA sobre tus comentarios
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {informe.analisisCuestionario.comentariosAnalizados || informe.analisisCuestionario.comentarios.length} comentarios analizados
+                    {informe.analisisCuestionario.modelo ? ` · ${informe.analisisCuestionario.modelo}` : ''}
+                    {informe.analisisCuestionario.generadoEn ? ` · ${formatDate(informe.analisisCuestionario.generadoEn)}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleAnalyzeCuestionario}
+                disabled={analyzingCuestionario}
+                className="px-3.5 py-2 rounded-lg border border-indigo-200 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-sm">refresh</span>
+                Actualizar orientación
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg p-4">
+              {informe.analisisCuestionario.resumen}
+            </p>
+
+            {informe.analisisCuestionario.comentarios.length > 0 && (
+              <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {informe.analisisCuestionario.comentarios.map((item, index) => (
+                  <article key={index} className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="font-bold text-slate-900 text-sm">{item.parte}</h3>
+                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${PRIORIDAD_CLASES[item.prioridad] || 'bg-slate-100 text-slate-700'}`}>
+                        {item.prioridad || 'media'}
+                      </span>
+                    </div>
+                    <p className="text-xs italic text-slate-500">“{item.comentario}”</p>
+                    <dl className="mt-3 space-y-2">
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Qué significa</dt>
+                        <dd className="text-xs text-slate-700 leading-relaxed mt-0.5">{item.explicacion}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Qué hacer o preguntar</dt>
+                        <dd className="text-xs text-slate-700 leading-relaxed mt-0.5">{item.orientacion}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {(informe.analisisCuestionario.recomendaciones_generales.length > 0 ||
+              informe.analisisCuestionario.preguntas_sugeridas.length > 0) && (
+              <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {informe.analisisCuestionario.recomendaciones_generales.length > 0 && (
+                  <div>
+                    <h3 className="text-[11px] uppercase tracking-widest font-bold text-slate-400 mb-2">
+                      Recomendaciones generales
+                    </h3>
+                    <ul className="space-y-1.5">
+                      {informe.analisisCuestionario.recomendaciones_generales.map((item, index) => (
+                        <li key={index} className="text-xs text-slate-700 flex items-start gap-2">
+                          <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {informe.analisisCuestionario.preguntas_sugeridas.length > 0 && (
+                  <div>
+                    <h3 className="text-[11px] uppercase tracking-widest font-bold text-slate-400 mb-2">
+                      Preguntas sugeridas
+                    </h3>
+                    <ul className="space-y-1.5">
+                      {informe.analisisCuestionario.preguntas_sugeridas.map((item, index) => (
+                        <li key={index} className="text-xs text-slate-700 flex items-start gap-2">
+                          <span className="material-symbols-outlined text-sm text-indigo-600">help</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="mt-5 text-[11px] text-slate-500 leading-relaxed">
+              {informe.analisisCuestionario.aviso || 'Orientación preliminar generada por IA.'}
+            </p>
+          </section>
+        )}
 
         {/* Fila Superior: Resumen Ejecutivo y Puntuación General (Bento Mosaic) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
@@ -311,7 +668,7 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
                 <span className="font-label-sm text-label-sm uppercase tracking-widest text-outline">Índice según Respuestas</span>
                 <span className="inline-flex items-center gap-1 font-label-sm text-label-sm text-tertiary font-bold bg-tertiary-fixed/50 px-2.5 py-0.5 rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
-                  Diagnóstico de prueba, sin IA
+                  Basado en tus respuestas
                 </span>
               </div>
               <div className="flex flex-col items-center justify-center my-2 text-center">
@@ -492,7 +849,7 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
         <div className="bg-surface-container-lowest rounded-xl p-6 shadow-md mb-8 border border-outline-variant/30">
           <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 gap-3 border-b border-surface-container">
             <div>
-              <span className="font-label-sm text-label-sm uppercase tracking-widest text-outline">Diagnóstico de prueba, sin IA</span>
+              <span className="font-label-sm text-label-sm uppercase tracking-widest text-outline">Basado en tus respuestas</span>
               <h2 className="font-headline-md text-headline-md text-primary font-bold">Diagnóstico Detallado por Componentes</h2>
             </div>
             {/* Categorías / Tabs */}
@@ -568,7 +925,7 @@ export const InformeDetalladoScreen: React.FC<InformeDetalladoScreenProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <span className="px-2.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm uppercase font-bold tracking-wider">
-                  Diagnóstico de prueba, sin IA
+                  Basado en tus respuestas
                 </span>
                 <span className="text-primary-fixed font-label-sm text-label-sm font-semibold">• Recomendación según respuestas</span>
               </div>

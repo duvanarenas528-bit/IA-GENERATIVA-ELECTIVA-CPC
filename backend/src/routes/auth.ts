@@ -1,6 +1,17 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { register, login, logout, refresh, me, uploadAvatar, getAvatar, deleteAvatar } from '../controllers/authController.js';
+import {
+  register,
+  login,
+  logout,
+  refresh,
+  me,
+  uploadAvatar,
+  getAvatar,
+  deleteAvatar,
+  forgotPassword,
+  resetPasswordWithCode,
+} from '../controllers/authController.js';
 import { requireAuth } from '../middlewares/auth.js';
 import { MAX_PHOTO_SIZE_BYTES, uploadPreperitajePhoto } from '../middlewares/upload.js';
 
@@ -25,6 +36,8 @@ function handleAvatarUpload(req: Request, res: Response, next: NextFunction) {
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPasswordWithCode);
 router.post('/logout', requireAuth, logout);
 router.post('/refresh', requireAuth, refresh);
 router.get('/me', requireAuth, me);

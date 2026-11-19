@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { ScreenId } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import type { ProfileStats, ScreenId } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { assetUrl } from '../services/api';
+import { assetUrl, getProfileStats } from '../services/api';
+import { openReport } from '../services/navigation';
 
 interface PerfilScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -26,6 +27,39 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState<boolean>(false);
   const [avatarFeedback, setAvatarFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [profileStats, setProfileStats] = useState<ProfileStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoadingStats(true);
+    getProfileStats()
+      .then((data) => {
+        if (active) setProfileStats(data);
+      })
+      .catch((error: Error) => {
+        if (active) setStatsError(error.message);
+      })
+      .finally(() => {
+        if (active) setLoadingStats(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const formatDate = (value: string | null) => {
+    if (!value) return 'Sin fecha';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Sin fecha';
+    return date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const openPeritaje = (id: string, screen: ScreenId) => {
+    openReport(id);
+    onNavigate(screen);
+  };
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -148,29 +182,110 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Preperitajes Totales
             </span>
-            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">
+              {loadingStats ? '…' : profileStats?.stats.total ?? 0}
+            </span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Tasa Aprobación IA
             </span>
-            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">
+              {loadingStats ? '…' : `${profileStats?.stats.tasaAprobacionIA ?? 0}%`}
+            </span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Tiempo Promedio
             </span>
-            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">
+              {loadingStats ? '…' : `${profileStats?.stats.tiempoPromedioMinutos ?? 0} min`}
+            </span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
               Certificados Emitidos
             </span>
-            <span className="text-2xl font-black text-slate-900 mt-1 block">—</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">
+              {loadingStats ? '…' : profileStats?.stats.certificados ?? 0}
+            </span>
           </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-6">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black text-slate-900">Peritajes realizados</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Historial de inspecciones y certificados asociados a tu cuenta.
+              </p>
+            </div>
+            {profileStats && (
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+                {profileStats.stats.completados} completados
+              </span>
+            )}
+          </div>
+
+          {statsError && (
+            <p className="px-5 py-3 text-xs font-semibold text-rose-700 bg-rose-50">{statsError}</p>
+          )}
+
+          {loadingStats ? (
+            <p className="px-5 py-6 text-xs text-slate-500">Cargando tu historial…</p>
+          ) : (profileStats?.peritajes.length || 0) === 0 ? (
+            <p className="px-5 py-6 text-xs text-slate-500">
+              Aún no tienes peritajes. Crea uno nuevo para comenzar.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {profileStats?.peritajes.map((item) => (
+                <div
+                  key={item.id}
+                  className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+                >
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span
+                      className={`material-symbols-outlined text-xl shrink-0 ${
+                        item.estado === 'completado' ? 'text-emerald-600' : 'text-amber-500'
+                      }`}
+                    >
+                      {item.estado === 'completado' ? 'verified' : 'description'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {item.marca || 'Vehículo'} {item.linea || ''} · {item.placa}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {formatDate(item.creadoEn)} · Score {item.score ?? 0}%
+                        {item.tieneAnalisisIA && ` · IA ${item.aprobadoIA ? 'aprobado' : 'observado'}`}
+                        {item.transferidoA && ` · Transferido a ${item.transferidoA}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => openPeritaje(item.id, 'informe-detallado')}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition"
+                    >
+                      Ver informe
+                    </button>
+                    {item.estado === 'completado' && (
+                      <button
+                        onClick={() => openPeritaje(item.id, 'visor-a4')}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition"
+                      >
+                        Certificado
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content Tabs & Panes */}
@@ -487,7 +602,7 @@ export const PerfilScreen: React.FC<PerfilScreenProps> = ({ onNavigate }) => {
                 </div>
 
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
-                  <strong>Protocolo de Inferencia:</strong> Gemini 2.5 Flash Multimodal Vision API configurada con soporte de latencia ultra-baja (&lt;1.5s por inferencia).
+                  <strong>Protocolo de Inferencia:</strong> Gemini 3.5 Flash Lite para análisis visual y API Ninjas para el catálogo de vehículos. Las llaves permanecen solo en el backend.
                 </div>
               </div>
             )}

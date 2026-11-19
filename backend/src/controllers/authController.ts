@@ -1,15 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
-import { registerSchema, loginSchema } from '../utils/validation.js';
-import { createUser, findUserByEmail, verifyPassword, checkRateLimit, incrementRateLimit, clearRateLimit } from '../services/authService.js';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../utils/validation.js';
+import { createUser, findUserByEmail, verifyPassword } from '../services/authService.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt.js';
 import { redis } from '../config/redis.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { pool } from '../db/pool.js';
 import { removeUploadedFile, UPLOADS_DIR } from '../middlewares/upload.js';
+import { requestPasswordReset, resetPassword } from '../services/passwordResetService.js';
 
 const isProd = process.env.NODE_ENV === 'production';
+const showResetCode = process.env.NODE_ENV !== 'production' && process.env.PASSWORD_RESET_SHOW_CODE !== 'false';
 
 function serializeUser(row: any) {
   const updatedAt = row.avatar_actualizado_en ? new Date(row.avatar_actualizado_en).getTime() : 0;
@@ -76,27 +78,66 @@ export async function login(req: Request, res: Response) {
       return res.status(400).json({ error: parsed.error.errors[0]?.message || 'Datos inválidos' });
     }
     const { correo, password } = parsed.data;
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
-    const rate = await checkRateLimit(correo, ip);
-    if (rate.blocked) {
-      return res.status(429).json({ error: 'Demasiados intentos. Intenta nuevamente más tarde.' });
-    }
     const user = await findUserByEmail(correo);
     if (!user) {
-      await incrementRateLimit(correo, ip);
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
     const ok = await verifyPassword(user.password_hash, password);
     if (!ok) {
-      await incrementRateLimit(correo, ip);
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
-    await clearRateLimit(correo, ip);
     const accessToken = generateAccessToken({ id: user.id, correo: user.correo, nombre: user.nombre, role: user.role || 'user' });
     const refreshToken = generateRefreshToken({ id: user.id });
     await redis.set(`refresh:${user.id}:${refreshToken}`, 'valid', 'EX', 7 * 24 * 60 * 60);
     setAuthCookies(res, accessToken, refreshToken);
     return res.json({ user: serializeUser(user) });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function forgotPassword(req: Request, res: Response) {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || 'Datos inválidos' });
+    }
+
+    const result = await requestPasswordReset(parsed.data.correo);
+    if (result.limited) {
+      return res.status(429).json({ error: 'Demasiadas solicitudes. Intenta nuevamente más tarde.' });
+    }
+
+    const response: { message: string; code?: string } = {
+      message: 'Si el correo está registrado, se generó un código de recuperación.',
+    };
+    if (showResetCode && result.code) {
+      response.code = result.code;
+    }
+
+    return res.json(response);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function resetPasswordWithCode(req: Request, res: Response) {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || 'Datos inválidos' });
+    }
+
+    const ip = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
+    const result = await resetPassword(parsed.data.token, parsed.data.password, ip);
+
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error || 'No se pudo restablecer la contraseña' });
+    }
+
+    return res.json({ message: 'Contraseña actualizada correctamente.' });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Error interno' });

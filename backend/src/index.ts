@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import vehiclesRouter, { reportsRouter } from './routes/vehicles.js';
 import preperitajesRouter from './routes/preperitajes.js';
 import adminRouter from './routes/admin.js';
+import catalogRouter from './routes/catalog.js';
+import usersRouter from './routes/users.js';
 
 dotenv.config();
 
@@ -28,6 +30,8 @@ app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/preperitajes', preperitajesRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/catalog', catalogRouter);
+app.use('/api/users', usersRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);

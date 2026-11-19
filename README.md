@@ -1,221 +1,337 @@
- AutoCheck — Preperitaje Vehicular con Inteligencia Artificial
+# AutoCheck — Preperitaje Vehicular con Inteligencia Artificial
 
-Descripción
+AutoCheck es una aplicación web full-stack que permite registrar un vehículo, responder un cuestionario técnico, cargar fotografías, generar un informe preliminar con IA y transferir el preperitaje a un nuevo propietario conservando el historial declarado.
 
-AutoCheck es una aplicación web que busca permitir a los propietarios o compradores de vehículos realizar un preperitaje preliminar de un automóvil antes de pagar por un peritaje profesional.
+> **Aviso importante:** los resultados son orientativos. AutoCheck no reemplaza un peritaje profesional, una inspección presencial ni un diagnóstico técnico oficial.
 
-El usuario podrá registrar la información de su vehículo, responder preguntas sobre su estado y antecedentes, y cargar fotografías de diferentes partes del automóvil.
+Última actualización: 18/11/2026.
 
-Mediante el uso de Inteligencia Artificial (IA), la aplicación analizará la información proporcionada para generar una valoración preliminar, identificar posibles daños visibles y mostrar un rango estimado del valor del vehículo.
+---
 
- Importante: Los resultados generados por AutoCheck son únicamente orientativos. La aplicación no reemplaza un peritaje profesional ni un diagnóstico realizado por un especialista.
+## Stack tecnológico
 
-⸻
+| Capa | Tecnología |
+| --- | --- |
+| Frontend | React + TypeScript + Vite |
+| Backend | Node.js + Express + TypeScript |
+| Base de datos | PostgreSQL |
+| Caché / sesiones | Redis |
+| IA | Gemini (`@google/genai`), modelo `gemini-3.5-flash-lite` |
+| Catálogo vehicular | API Ninjas Cars, con caché en Redis y fallback local |
+| Infraestructura local | Docker Compose |
+| Autenticación | JWT en cookies httpOnly + refresh token |
 
- Objetivo del proyecto
+---
 
-El objetivo principal es brindar al usuario una primera referencia sobre el estado y el valor aproximado de un vehículo, ayudándolo a decidir si vale la pena realizar un peritaje profesional.
+## Estructura principal
 
-La aplicación busca combinar:
+```text
+.
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── db/migrations/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   └── index.ts
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── constants/
+│   │   ├── context/
+│   │   ├── screens/
+│   │   ├── services/
+│   │   └── types.ts
+│   └── package.json
+├── docker-compose.yml
+└── .env.example
+```
 
-* Análisis de fotografías.
-*  Inteligencia Artificial.
-*  Información proporcionada por el usuario.
-*  Datos básicos del vehículo.
-*  Estimación preliminar del valor.
-* Generación de un informe de resultados.
+---
 
-⸻
+## Requisitos
 
- Funcionamiento
+- Node.js 20 o superior.
+- Docker y Docker Compose.
+- Clave API de Gemini.
+- Clave API de API Ninjas (opcional; sin ella se usa el catálogo local de respaldo).
 
-El proceso planteado para AutoCheck es:
+---
 
-Usuario
-   ↓
+## Configuración local
+
+### 1. Variables de entorno
+
+Copiar la plantilla tanto en la raíz como en `backend/`:
+
+```bash
+cp .env.example .env
+cp .env.example backend/.env
+```
+
+Editar `backend/.env` con las claves reales:
+
+```env
+GEMINI_API_KEY=tu_clave_gemini
+GEMINI_MODEL=gemini-3.5-flash-lite
+API_NINJAS_KEY=tu_clave_api_ninjas
+```
+
+> Las claves deben estar solo en el backend. Nunca se exponen en variables `VITE_*` ni en el frontend.
+
+### 2. Levantar PostgreSQL y Redis
+
+```bash
+docker compose up -d
+```
+
+Servicios:
+
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+
+### 3. Instalar dependencias
+
+```bash
+(cd backend && npm install)
+(cd frontend && npm install)
+```
+
+### 4. Aplicar migraciones
+
+```bash
+cd backend
+npm run migrate
+```
+
+Migraciones actuales: `001` a `010`, incluyendo análisis IA, traspasos, análisis del cuestionario e historial de mantenimiento.
+
+### 5. Ejecutar la aplicación
+
+En una terminal:
+
+```bash
+cd backend
+npm run dev
+```
+
+En otra terminal:
+
+```bash
+cd frontend
+npm run dev
+```
+
+URLs:
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:4000
+- Health check: http://localhost:4000/api/health
+
+---
+
+## Comandos de verificación
+
+```bash
+cd backend && npm run build
+cd frontend && npm run build
+cd frontend && npm run lint
+```
+
+---
+
+## Flujo de uso
+
+```text
 Crear cuenta
-   ↓
-Registrar vehículo
-   ↓
-Subir fotografías
-   ↓
-Responder preguntas
-   ↓
-Análisis mediante IA
-   ↓
-Identificación de posibles daños
-   ↓
-Estimación del valor
-   ↓
-Informe del preperitaje
+  ↓
+Registrar vehículo con marca, modelo y año desde catálogo
+  ↓
+Responder cuestionario por 8 partes del vehículo
+  ↓
+Registrar historial de mantenimiento
+  ↓
+Cargar fotografías por zonas
+  ↓
+Generar informe con reglas e IA
+  ↓
+Consultar informe detallado, certificado A4 y ficha de venta
+  ↓
+Transferir el preperitaje a una cuenta existente por correo
+  ↓
+El nuevo dueño conserva informe, mantenimiento e historial
+```
 
-⸻
+---
 
-Historias de usuario
+## Funcionalidades implementadas
 
-1. Registro del usuario
+### Cuenta y perfil
 
-Como usuario, quiero crear una cuenta en la aplicación para guardar la información de mis vehículos y consultar mis preperitajes.
+- Registro, login, logout y refresh token.
+- Recuperación de contraseña con código de 6 dígitos, vigencia de 10 minutos y un solo uso.
+- En desarrollo, el código puede mostrarse en la respuesta según `PASSWORD_RESET_SHOW_CODE`.
+- Perfil con métricas reales:
+  - total de preperitajes;
+  - completados;
+  - certificados;
+  - tasa de aprobación IA;
+  - tiempo promedio de elaboración;
+  - historial de inspecciones.
 
-Criterios de aceptación:
+### Registro del vehículo
 
-* El usuario puede registrarse con sus datos básicos.
-* El sistema valida los campos obligatorios.
-* El usuario puede iniciar sesión.
-* El sistema informa si existe algún error durante el registro.
+- Placa, marca, línea, año, kilometraje, color, combustible y transmisión.
+- Selectores dependientes de marca → modelo → año.
+- Catálogo obtenido desde API Ninjas con caché Redis de 24 horas.
+- Fallback local cuando la API externa no está disponible.
 
-⸻
+### Cuestionario
 
-2. Registro del vehículo
+El cuestionario evalúa 8 partes:
 
-Como usuario, quiero registrar los datos de mi vehículo para que la aplicación pueda realizar un análisis más preciso.
+1. Lateral derecho.
+2. Lateral izquierdo.
+3. Frente y capó.
+4. Parte trasera y maletero.
+5. Techo y cristales.
+6. Compartimiento del motor.
+7. Llantas y rines.
+8. Interior y odómetro.
 
-Criterios de aceptación:
+Las preguntas 1 a 4 usan opciones generales de carrocería. Las preguntas 5 a 8 usan opciones específicas por sección, por ejemplo:
 
-* Permite ingresar marca, modelo, año y kilometraje.
-* Permite ingresar la placa del vehículo.
-* Valida la información obligatoria.
-* La información queda asociada al usuario.
+- Cristales: rayones, piquetes, fisuras, vidrio roto, filtración de agua o reemplazo.
+- Motor: encendido irregular, fugas, niveles bajos, ruidos, componentes desgastados o reparaciones previas.
+- Llantas: desgaste irregular, banda desgastada, grietas, pinchazos, rines golpeados o referencias diferentes.
+- Interior: desgaste normal, tapicería deteriorada, tablero dañado, testigos encendidos o inconsistencias del odómetro.
 
-⸻
+Cada opción tiene una severidad asociada: `optima`, `baja`, `media` o `alta`.
 
-3. Carga de fotografías
+### Historial de mantenimiento
 
-Como usuario, quiero subir fotografías de diferentes partes de mi vehículo para que la aplicación pueda identificar posibles daños visibles.
+En el paso 2 del cuestionario se registran:
 
-Criterios de aceptación:
+- Fecha del último cambio de aceite.
+- Kilometraje en el cambio de aceite.
+- Taller o lugar del cambio de aceite.
+- Fecha del último mantenimiento.
+- Taller o lugar del último mantenimiento.
+- Detalle de lo realizado en ese mantenimiento.
 
-* Permite cargar varias fotografías.
-* La aplicación indica qué partes del vehículo se deben fotografiar.
-* Verifica que las imágenes tengan una calidad adecuada.
-* El usuario puede eliminar o reemplazar fotografías.
+El informe calcula adicionalmente:
 
-⸻
+- kilómetros recorridos desde el cambio de aceite;
+- próximo cambio de aceite aproximado, usando una referencia de 5.000 km.
 
-4. Preguntas sobre el vehículo
+### Fotografías
 
-Como usuario, quiero responder preguntas sobre el estado y antecedentes de mi vehículo para complementar la información obtenida mediante las fotografías.
+- Seis zonas sugeridas: frontal, lateral, motor, odómetro, trasera e interior.
+- Validación de tipo y tamaño de archivo.
+- Fotos asociadas al preperitaje y al propietario actual.
+- Las fotos se transfieren junto con el preperitaje.
 
-Criterios de aceptación:
+### Inteligencia Artificial
 
-* La aplicación muestra preguntas relacionadas con el vehículo.
-* El usuario puede responderlas.
-* Identifica preguntas obligatorias sin responder.
-* Guarda las respuestas junto con el preperitaje.
+AutoCheck usa Gemini para dos análisis independientes:
 
-⸻
+1. **Análisis visual:** examina las fotografías, datos del vehículo y respuestas del cuestionario. Devuelve estado general, hallazgos visuales, recomendaciones y rango de valor estimado en COP.
+2. **Análisis de comentarios:** lee las observaciones abiertas del cuestionario y devuelve una explicación por comentario, orientación práctica, prioridad, recomendaciones generales y preguntas sugeridas.
 
-5. Análisis mediante Inteligencia Artificial
+Ambos resultados se guardan en el preperitaje y se muestran en el informe. El análisis de comentarios funciona aunque no haya fotografías, siempre que exista al menos una observación escrita.
 
-Como usuario, quiero que la aplicación analice mis fotografías y respuestas mediante Inteligencia Artificial para conocer posibles daños o problemas del vehículo.
+### Informe, certificado y ficha de venta
 
-Criterios de aceptación:
+- Informe detallado con score, hallazgos, fotos, análisis IA y orientación sobre comentarios.
+- Certificado A4 imprimible y descargable.
+- Ficha de venta con estado de partes, historial de mantenimiento y datos para el comprador.
+- Avisos legales que indican que el resultado no es vinculante.
 
-* La IA analiza las fotografías y respuestas.
-* Identifica posibles daños visibles.
-* Muestra los aspectos que deberían ser revisados.
-* Indica que el resultado es preliminar y no reemplaza un peritaje profesional.
+### Traspaso al nuevo dueño
 
-⸻
+- Se realiza desde la ficha de venta indicando el correo de una cuenta existente.
+- El backend valida que la cuenta exista antes de transferir.
+- Se actualiza `preperitajes.user_id` y `preperitaje_fotos.user_id`.
+- Se registran folio, notas, propietario anterior, receptor y fecha de transferencia.
+- El nuevo dueño puede consultar el informe y ve el historial de mantenimiento declarado.
+- El vendedor conserva el historial como propietario anterior en sus métricas.
 
-6. Estimación del valor del vehículo
+---
 
-Como usuario, quiero conocer un rango estimado del valor de mi vehículo para tener una referencia antes de pagar un peritaje profesional.
+## API principal
 
-Criterios de aceptación:
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/api/health` | Estado del backend |
+| `POST` | `/api/auth/register` | Registro |
+| `POST` | `/api/auth/login` | Inicio de sesión |
+| `POST` | `/api/auth/forgot-password` | Solicitar código de recuperación |
+| `POST` | `/api/auth/reset-password` | Restablecer contraseña |
+| `GET` | `/api/auth/me` | Usuario autenticado |
+| `GET` | `/api/vehicles/stats` | Métricas del panel |
+| `POST` | `/api/vehicles/preperitajes` | Crear preperitaje |
+| `GET` | `/api/vehicles/preperitajes` | Listar preperitajes |
+| `GET` | `/api/vehicles/preperitajes/:id` | Obtener preperitaje |
+| `PUT` / `PATCH` | `/api/vehicles/preperitajes/:id` | Actualizar preperitaje |
+| `GET` | `/api/preperitajes/:id/informe` | Generar/consultar informe |
+| `POST` | `/api/preperitajes/:id/analizar-fotos` | Análisis visual con IA |
+| `POST` | `/api/preperitajes/:id/analizar-cuestionario` | Análisis de comentarios con IA |
+| `POST` | `/api/preperitajes/:id/transferir` | Transferir a otra cuenta |
+| `GET` / `POST` | `/api/preperitajes/:id/fotos` | Listar o subir fotos |
+| `GET` | `/api/catalog/makes` | Marcas |
+| `GET` | `/api/catalog/models?make=...` | Modelos por marca |
+| `GET` | `/api/catalog/years?make=...&model=...` | Años por marca/modelo |
+| `GET` | `/api/users/me/stats` | Métricas del perfil |
+| `GET` | `/api/admin/overview` | Panel administrativo, solo admin |
 
-* Tiene en cuenta marca, modelo, año y kilometraje.
-* Considera los posibles daños identificados.
-* Muestra un rango de valor estimado.
-* Explica los principales factores que influyeron en la estimación.
+---
 
-⸻
+## Consideraciones de seguridad
 
-7. Informe del preperitaje
+- Las credenciales y claves externas se leen únicamente en el backend.
+- Las contraseñas se almacenan con hash.
+- Los tokens de acceso y refresh se envían en cookies httpOnly.
+- El refresh token se valida contra Redis.
+- El frontend no recibe claves de Gemini ni de API Ninjas.
+- Las rutas de preperitajes validan propiedad del recurso; el rol `admin` tiene acceso de lectura cuando corresponde.
+- Rotar las claves API antes de compartir o desplegar públicamente el proyecto.
 
-Como usuario, quiero consultar un informe con los resultados del preperitaje para decidir si necesito realizar un peritaje profesional.
+---
 
-Criterios de aceptación:
+## Limitaciones
 
-* Muestra un resumen del estado del vehículo.
-* Muestra los posibles daños encontrados.
-* Muestra el rango de valor estimado.
-* Permite consultar nuevamente el resultado.
+- La IA puede interpretar incorrectamente fotografías o comentarios.
+- El rango de valor es una referencia preliminar, no una tasación comercial.
+- El próximo cambio de aceite es una referencia aproximada basada en kilometraje; no reemplaza el plan del fabricante.
+- Sin clave de API Ninjas se usa un catálogo local limitado.
+- Sin clave de Gemini no se generan los análisis IA; el informe de reglas sigue funcionando.
 
-⸻
+---
 
-🔍 Auditoría de salida
+## Documentación académica
 
-Funcionalidad	Evaluación	Justificación
-Registro del usuario	Útil	Permite identificar al usuario y guardar sus preperitajes.
-Registrar vehículo	Útil	Es información fundamental para realizar el análisis.
-Subir fotografías	Esencial	Es una de las funciones principales del proyecto.
-Responder preguntas	Esencial	Complementa el análisis visual con información que una fotografía no puede proporcionar.
-Análisis mediante IA	Esencial	Es el principal componente diferenciador del proyecto.
-Estimación del valor	Esencial	Cumple uno de los objetivos principales de la aplicación.
-Ver resultado	Útil	Permite al usuario interpretar y utilizar el resultado del preperitaje.
+* [Diagrama de componentes](mi-framework-ia/docs/proyecto/07_DIAGRAMA_COMPONENTES.md)
+* [Diagrama de base de datos](mi-framework-ia/docs/proyecto/08_DIAGRAMA_BASE_DATOS.md)
+* [Diagrama de clases](mi-framework-ia/docs/proyecto/09_DIAGRAMA_CLASES.md)
+* [Historias de usuario](mi-framework-ia/docs/proyecto/03_HISTORIAS_USUARIO.md)
+* [Requerimientos](mi-framework-ia/docs/proyecto/02_REQUERIMIENTOS.md)
+* [Detalle del proyecto y prompts](mi-framework-ia/docs/proyecto/README.md)
 
-⸻
+---
 
- Uso de Inteligencia Artificial
+## Información académica
 
-La Inteligencia Artificial es el componente principal de AutoCheck.
+- Proyecto: IA Generativa — AutoCheck
+- Institución: Corporación Universitaria Minuto de Dios — UNIMINUTO
+- Programa: Ingeniería de Sistemas
+- Asignatura: Electiva CPC
 
-Su función será analizar:
-
-Información del vehículo + Fotografías + Respuestas del usuario
-
-para generar:
-
-* Posibles daños visibles.
-* Aspectos que deberían ser revisados.
-* Valoración preliminar.
-* Rango estimado del valor del vehículo.
-* Factores que influyeron en la estimación.
-
-⸻
-
-Consideraciones y limitaciones
-
-La IA puede cometer errores al interpretar fotografías o estimar valores.
-
-Por esta razón, los resultados no deben presentarse como un diagnóstico definitivo.
-
-AutoCheck debe dejar claro que es una herramienta de orientación y que un peritaje profesional sigue siendo necesario para confirmar el estado real del vehículo.
-
-⸻
-
- Conclusiones
-
-AutoCheck busca ayudar a los propietarios o compradores de vehículos a obtener una primera referencia sobre el estado y valor aproximado de un automóvil antes de pagar un peritaje profesional.
-
-La utilización de Inteligencia Artificial permitirá analizar fotografías y respuestas del usuario para generar una valoración preliminar.
-
-Sin embargo, mediante la auditoría humana se identificó que los resultados generados por la IA deben considerarse orientativos y no deben sustituir la evaluación realizada por un profesional.
-
-⸻
-
- Arquitectura y diagramas
-
-* [Diagrama de componentes](mi-framework-ia/docs/proyecto/07_DIAGRAMA_COMPONENTES.md) — frontend, backend, Supabase y servicio de IA externo (Gemini).
-* [Diagrama de base de datos](mi-framework-ia/docs/proyecto/08_DIAGRAMA_BASE_DATOS.md) — modelo relacional sobre Supabase/PostgreSQL.
-* [Diagrama de clases](mi-framework-ia/docs/proyecto/09_DIAGRAMA_CLASES.md) — clases principales de AutoCheck y sus relaciones, coherentes con el modelo de datos.
-
-El detalle de cada etapa del proceso de análisis, y los prompts utilizados con la IA en cada una, están en [docs/proyecto/README.md](mi-framework-ia/docs/proyecto/README.md).
-
-⸻
-
- Información académica
-
-Proyecto: IA Generativa — AutoCheck
-Institución: Corporación Universitaria Minuto de Dios — UNIMINUTO
-Programa: Ingeniería de Sistemas
-Asignatura: Electiva CPC
 Integrantes:
 
 * Duban Tibaquira
 * Leni Santiago Murillo
 
-Tutor: Esteban
-Ciudad: Ibagué
-Fecha: 05/10/2026
+- Tutor: Esteban
+- Ciudad: Ibagué
+- Fecha original del proyecto: 05/10/2026

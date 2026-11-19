@@ -1,20 +1,27 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Frontend AutoCheck
 
-# Run and deploy your AI Studio app
+Aplicación React + TypeScript + Vite para el preperitaje vehicular.
 
-This contains everything you need to run your app locally.
+## Ejecutar en local
 
-View your app in AI Studio: https://ai.studio/apps/709d80ec-ce3f-48e1-b10f-b7f7a2b6f747
+Requisitos: Node.js 20 o superior y el backend de AutoCheck corriendo en `http://localhost:4000`.
 
-## Run Locally
+```bash
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+El frontend queda disponible en http://localhost:5173.
 
+## Configuración
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+La URL del backend está definida en `src/services/api.ts` como `http://localhost:4000/api`.
+
+No configurar claves de Gemini ni de API Ninjas en este proyecto. Todas las claves externas se usan únicamente en el backend. Consulta el [README principal](../README.md) para configurar `.env`, PostgreSQL, Redis y las migraciones.
+
+## Verificación
+
+```bash
+npm run build
+npm run lint
+```

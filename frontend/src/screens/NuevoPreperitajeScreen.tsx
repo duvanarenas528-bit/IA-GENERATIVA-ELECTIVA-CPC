@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScreenId, VehiclePartEvaluation, PartCondition } from '../types';
+import { conditionOptionsForPart, severityForCondition } from '../constants/questionnaire';
 import { AutoCheckLogo } from '../components/AutoCheckLogo';
-import { createPreperitaje, updatePreperitaje, uploadPreperitajeFoto, assetUrl } from '../services/api';
+import {
+  createPreperitaje,
+  updatePreperitaje,
+  uploadPreperitajeFoto,
+  assetUrl,
+  getCarMakes,
+  getCarModels,
+  getCarYears,
+} from '../services/api';
 import { openReport } from '../services/navigation';
 
 interface NuevoPreperitajeScreenProps {
@@ -87,6 +96,24 @@ const PHOTO_SLOTS = [
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+interface MantenimientoForm {
+  ultimoCambioAceiteFecha: string;
+  ultimoCambioAceiteKm: string;
+  ultimoCambioAceiteTaller: string;
+  ultimoMantenimientoFecha: string;
+  ultimoMantenimientoDescripcion: string;
+  ultimoMantenimientoTaller: string;
+}
+
+const INITIAL_MANTENIMIENTO: MantenimientoForm = {
+  ultimoCambioAceiteFecha: '',
+  ultimoCambioAceiteKm: '',
+  ultimoCambioAceiteTaller: '',
+  ultimoMantenimientoFecha: '',
+  ultimoMantenimientoDescripcion: '',
+  ultimoMantenimientoTaller: '',
+};
+
 export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ onNavigate }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
@@ -101,20 +128,88 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
   const [transmission, setTransmission] = useState('');
   const [preperitajeId, setPreperitajeId] = useState<string | null>(null);
 
+  const [makes, setMakes] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [years, setYears] = useState<string[]>([]);
+  const [loadingMakes, setLoadingMakes] = useState(true);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [loadingYears, setLoadingYears] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoadingMakes(true);
+    getCarMakes()
+      .then((result) => {
+        if (active) {
+          setMakes(result.values);
+          setCatalogError(result.source === 'fallback' ? 'Catálogo local temporal: API Ninjas no disponible.' : '');
+        }
+      })
+      .catch((error: Error) => {
+        if (active) setCatalogError(error.message);
+      })
+      .finally(() => {
+        if (active) setLoadingMakes(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setModel('');
+    setYear('');
+    setModels([]);
+    setYears([]);
+    if (!brand) return;
+
+    let active = true;
+    setLoadingModels(true);
+    getCarModels(brand)
+      .then((result) => {
+        if (active) setModels(result.values);
+      })
+      .catch(() => {
+        if (active) setCatalogError('No se pudieron cargar los modelos de esa marca.');
+      })
+      .finally(() => {
+        if (active) setLoadingModels(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [brand]);
+
+  useEffect(() => {
+    setYear('');
+    setYears([]);
+    if (!brand || !model) return;
+
+    let active = true;
+    setLoadingYears(true);
+    getCarYears(brand, model)
+      .then((result) => {
+        if (active) setYears(result.values);
+      })
+      .catch(() => {
+        if (active) setCatalogError('No se pudieron cargar los años de ese modelo.');
+      })
+      .finally(() => {
+        if (active) setLoadingYears(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [brand, model]);
+
   // Parts Questionnaire (Step 2: El usuario nos cuenta el estado)
   const [parts, setParts] = useState<VehiclePartEvaluation[]>(INITIAL_PARTS);
+  const [mantenimiento, setMantenimiento] = useState<MantenimientoForm>(INITIAL_MANTENIMIENTO);
 
   // Photo Uploads (Step 3: Guardar fotos en la plataforma)
   const [uploadedPhotos, setUploadedPhotos] = useState<{ [key: string]: string }>({});
   const [uploadingPhoto, setUploadingPhoto] = useState<{ [key: string]: boolean }>({});
-
-  const conditionOptions: { value: PartCondition; label: string; icon: string; color: string }[] = [
-    { value: 'good', label: 'En buen estado / Original', icon: 'check_circle', color: 'border-emerald-500 bg-emerald-50 text-emerald-800' },
-    { value: 'scratches', label: 'Rayones leves superficiales', icon: 'draw', color: 'border-amber-400 bg-amber-50 text-amber-800' },
-    { value: 'dents', label: 'Golpes / Abolladuras', icon: 'handyman', color: 'border-orange-500 bg-orange-50 text-orange-800' },
-    { value: 'repainted', label: 'Repintado / Descolorido', icon: 'format_paint', color: 'border-blue-500 bg-blue-50 text-blue-800' },
-    { value: 'broken', label: 'Pieza rota o faltante', icon: 'warning', color: 'border-rose-500 bg-rose-50 text-rose-800' },
-  ];
 
   const handleConditionChange = (id: string, condition: PartCondition) => {
     setParts((prev) =>
@@ -123,7 +218,7 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
           ? {
               ...p,
               condition,
-              severity: condition === 'good' ? 'optima' : condition === 'scratches' ? 'baja' : condition === 'repainted' ? 'media' : 'alta',
+              severity: severityForCondition(condition),
             }
           : p
       )
@@ -134,6 +229,10 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
     setParts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, userObservations: text } : p))
     );
+  };
+
+  const handleMantenimientoChange = (field: keyof MantenimientoForm, value: string) => {
+    setMantenimiento((prev) => ({ ...prev, [field]: value }));
   };
 
   const openPhotoPicker = (slot: string) => {
@@ -289,39 +388,55 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Marca
                 </label>
-                <input
-                  type="text"
+                <select
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Ej. Renault"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
+                  disabled={loadingMakes}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none disabled:opacity-60"
+                >
+                  <option value="">{loadingMakes ? 'Cargando marcas...' : 'Selecciona una marca'}</option>
+                  {makes.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Línea / Modelo
                 </label>
-                <input
-                  type="text"
+                <select
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="Ej. Duster Dynamique"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
+                  disabled={!brand || loadingModels}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none disabled:opacity-60"
+                >
+                  <option value="">
+                    {!brand ? 'Primero elige una marca' : loadingModels ? 'Cargando modelos...' : 'Selecciona un modelo'}
+                  </option>
+                  {models.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Año Modelo
                 </label>
-                <input
-                  type="number"
+                <select
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
-                  placeholder="Ej. 2021"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
+                  disabled={!brand || !model || loadingYears}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:outline-none disabled:opacity-60"
+                >
+                  <option value="">
+                    {!model ? 'Elige marca y modelo' : loadingYears ? 'Cargando años...' : 'Selecciona un año'}
+                  </option>
+                  {years.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -383,6 +498,16 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
               </div>
             </div>
 
+            {catalogError && (
+              <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {catalogError}
+              </p>
+            )}
+
+            <p className="text-[10px] text-slate-400 -mt-2">
+              Catálogo de marcas, modelos y años sincronizado desde API Ninjas. Las opciones se filtran automáticamente.
+            </p>
+
             <div className="pt-4 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
@@ -390,6 +515,8 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                   const yearNum = parseInt(year);
                   const currentYear = new Date().getFullYear();
                   if (!plate) return alert('Placa requerida');
+                  if (!brand) return alert('Selecciona una marca');
+                  if (!model) return alert('Selecciona un modelo');
                   if (!yearNum || yearNum < 1980 || yearNum > currentYear + 1) return alert('Año inválido');
                   const mileageNum = mileage === '' ? null : parseInt(mileage);
                   if (mileage !== '' && (isNaN(mileageNum as number) || (mileageNum as number) < 0)) return alert('Kilometraje inválido');
@@ -405,6 +532,7 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                         combustible: fuelType,
                         transmision: transmission,
                         respuestas: {},
+                        mantenimiento,
                         estado: 'borrador',
                       });
                       setPreperitajeId(res.preperitaje.id);
@@ -418,6 +546,7 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                         color,
                         combustible: fuelType,
                         transmision: transmission,
+                        mantenimiento,
                       });
                     }
                   } catch (e: any) {
@@ -447,8 +576,115 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                   Cuéntanos el estado real de tu vehículo
                 </strong>
                 <p className="text-xs text-blue-800 mt-0.5 leading-relaxed">
-                  Selecciona la opción que mejor describa cada parte del auto (si está bien, con rayones, golpes, repintado o roto) y usa el campo abierto para dar detalles. <strong>La IA analizará tus respuestas para darte recomendaciones preventivas y correctivas en el informe.</strong>
+                  Selecciona la opción que mejor describa cada parte del auto; las opciones cambian según la sección (carrocería, cristales, motor, llantas o interior). Usa el campo abierto para dar detalles. <strong>La IA analizará tus respuestas para darte recomendaciones preventivas y correctivas en el informe.</strong>
                 </p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+              <div className="flex items-start gap-3 border-b border-slate-100 pb-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined">history</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    Historial de mantenimiento
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                    Estos datos se guardan en el preperitaje y el nuevo propietario podrá verlos después del traspaso.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+                  <h4 className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">oil_barrel</span>
+                    ¿Cuándo se le cambió el aceite por última vez?
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Fecha del cambio
+                      </span>
+                      <input
+                        type="date"
+                        value={mantenimiento.ultimoCambioAceiteFecha}
+                        onChange={(e) => handleMantenimientoChange('ultimoCambioAceiteFecha', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Kilometraje en el cambio
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={mantenimiento.ultimoCambioAceiteKm}
+                        onChange={(e) => handleMantenimientoChange('ultimoCambioAceiteKm', e.target.value)}
+                        placeholder="Ej. 45000"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      Taller o lugar donde se hizo
+                    </span>
+                    <input
+                      type="text"
+                      value={mantenimiento.ultimoCambioAceiteTaller}
+                      onChange={(e) => handleMantenimientoChange('ultimoCambioAceiteTaller', e.target.value)}
+                      placeholder="Ej. Taller Motors"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                    />
+                  </label>
+                </div>
+
+                <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 space-y-3">
+                  <h4 className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">build</span>
+                    ¿Cuándo fue el último mantenimiento?
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Fecha del mantenimiento
+                      </span>
+                      <input
+                        type="date"
+                        value={mantenimiento.ultimoMantenimientoFecha}
+                        onChange={(e) => handleMantenimientoChange('ultimoMantenimientoFecha', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Taller o lugar donde se hizo
+                      </span>
+                      <input
+                        type="text"
+                        value={mantenimiento.ultimoMantenimientoTaller}
+                        onChange={(e) => handleMantenimientoChange('ultimoMantenimientoTaller', e.target.value)}
+                        placeholder="Ej. Concesionario Mazda"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      ¿Qué se hizo en ese mantenimiento?
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={mantenimiento.ultimoMantenimientoDescripcion}
+                      onChange={(e) => handleMantenimientoChange('ultimoMantenimientoDescripcion', e.target.value)}
+                      placeholder="Ej. Cambio de aceite, filtros, revisión de frenos y alineación..."
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -475,7 +711,7 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                       ¿En qué estado se encuentra esta parte?
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                      {conditionOptions.map((opt) => (
+                      {conditionOptionsForPart(part.id).map((opt) => (
                         <button
                           key={opt.value}
                           type="button"
@@ -664,6 +900,7 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                       await updatePreperitaje(preperitajeId, {
                         estado: 'completado',
                         respuestas: parts,
+                        mantenimiento,
                       });
                     }
                   } catch (e: any) {

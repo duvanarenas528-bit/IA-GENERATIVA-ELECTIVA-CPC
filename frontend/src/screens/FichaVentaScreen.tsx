@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ScreenId, MaintenanceItem, PreperitajeInforme } from '../types';
+import type { ScreenId, MaintenanceItem, PreperitajeInforme } from '../types';
 import { AutoCheckLogo } from '../components/AutoCheckLogo';
 import { useAuth } from '../context/AuthContext';
 import { useVehicles } from '../context/VehicleContext';
-import { assetUrl, getPreperitajeInforme, listPreperitajes } from '../services/api';
+import {
+  assetUrl,
+  getPreperitajeInforme,
+  listPreperitajes,
+  transferPreperitaje,
+} from '../services/api';
+import { isGoodCondition } from '../constants/questionnaire';
 
 interface FichaVentaScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -23,10 +29,9 @@ function formatReportDate(value?: string) {
 }
 
 export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, preperitajeId }) => {
-  const { user, loginWithEmail } = useAuth();
+  const { user } = useAuth();
   const {
     selectedVehicle,
-    transferVehicle,
     addMaintenanceToVehicle,
     resetDefaultVehicles,
   } = useVehicles();
@@ -41,7 +46,7 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
   const [informeError, setInformeError] = useState('');
 
   // In-app transfer form state
-  const [buyerEmail, setBuyerEmail] = useState<string>('duban.tibaquira@uniminuto.edu.co');
+  const [buyerEmail, setBuyerEmail] = useState<string>('');
   const [transferNotes, setTransferNotes] = useState<string>('Traspaso por compraventa acordada. Entrega con 2 llaves y carpeta de mantenimientos al día.');
   const [isTransferring, setIsTransferring] = useState<boolean>(false);
   const [transferResult, setTransferResult] = useState<{
@@ -65,22 +70,39 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
     (async () => {
       setLoadingInforme(true);
       setInformeError('');
+      setResolvedId('');
+
+      const requestedId = preperitajeId || '';
+      let lastError: any = null;
+
       try {
-        let id = preperitajeId || '';
-        if (!id) {
-          const data = await listPreperitajes();
-          const lista: any[] = data.preperitajes || [];
-          const latest = lista.find((p) => p.estado === 'completado') || lista[0];
-          id = latest?.id || '';
-        }
-        if (!id) return;
-        const data = await getPreperitajeInforme(id);
+        if (!requestedId) throw new Error('Sin preperitaje seleccionado');
+        const data = await getPreperitajeInforme(requestedId);
         if (active) {
           setInforme(data.informe);
-          setResolvedId(id);
+          setResolvedId(requestedId);
         }
       } catch (e: any) {
-        if (active) setInformeError(e.message || 'No se pudo cargar el preperitaje.');
+        lastError = e;
+        try {
+          const data = await listPreperitajes();
+          const lista: any[] = data.preperitajes || [];
+          const fallback =
+            lista.find((p) => p.estado === 'completado' && p.id !== requestedId) ||
+            lista.find((p) => p.id !== requestedId) ||
+            lista[0];
+          if (!fallback) throw lastError || new Error('No tienes preperitajes registrados.');
+          const informeData = await getPreperitajeInforme(fallback.id);
+          if (active) {
+            setInforme(informeData.informe);
+            setResolvedId(fallback.id);
+            setInformeError('');
+          }
+        } catch (fallbackError: any) {
+          if (active) {
+            setInformeError(fallbackError?.message || 'No se pudo cargar el preperitaje.');
+          }
+        }
       } finally {
         if (active) setLoadingInforme(false);
       }
@@ -134,17 +156,18 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
   const displayColor = reportVehicle?.color || selectedVehicle?.color || 'N/D';
   const displayFuel = reportVehicle?.combustible || 'N/D';
   const displayTransmission = reportVehicle?.transmision || 'N/D';
+  const mantenimiento = informe?.mantenimiento ?? null;
   const displayOwnerEmail = informe?.usuario.correo || selectedVehicle?.ownerEmail || '';
   const displayOwnerName = informe?.usuario.nombre || displayOwnerEmail;
   const displayScore = informe?.resumen.porcentajeBuenas ?? selectedVehicle?.score ?? 0;
   const totalPartes = informe?.resumen.totalPartes ?? selectedVehicle?.parts.length ?? 0;
   const partesBuenas =
     informe?.resumen.partesBuenas ??
-    selectedVehicle?.parts.filter((part) => part.condition === 'good').length ??
+    selectedVehicle?.parts.filter((part) => isGoodCondition(part.condition)).length ??
     0;
   const partesConProblemas =
     informe?.resumen.partesConProblemas ??
-    selectedVehicle?.parts.filter((part) => part.condition !== 'good' && part.condition !== 'not-applicable')
+    selectedVehicle?.parts.filter((part) => !isGoodCondition(part.condition) && part.condition !== 'not-applicable')
       .length ??
     0;
   const displayImage = informe
@@ -163,43 +186,63 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
   // Handle in-app ownership transfer
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVehicle) {
-      setTransferResult({ success: false, error: 'No hay un vehículo asociado para realizar el traspaso.' });
+
+    let idToTransfer = resolvedId;
+    if (!idToTransfer) {
+      try {
+        const data = await listPreperitajes();
+        const lista: any[] = data.preperitajes || [];
+        const fallback = lista.find((p) => p.estado === 'completado') || lista[0];
+        idToTransfer = fallback?.id || '';
+        if (idToTransfer) setResolvedId(idToTransfer);
+      } catch {
+        idToTransfer = '';
+      }
+    }
+
+    if (!idToTransfer) {
+      setTransferResult({ success: false, error: 'No hay un preperitaje guardado para transferir.' });
       return;
     }
-    if (informe && displayPlate && selectedVehicle.plate !== displayPlate) {
-      setTransferResult({
-        success: false,
-        error: 'El preperitaje mostrado no está asociado al vehículo del garaje. Verifica la placa antes de transferir.',
-      });
+    if (!buyerEmail) {
+      setTransferResult({ success: false, error: 'Escribe el correo del nuevo dueño.' });
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail)) {
+      setTransferResult({ success: false, error: 'Escribe un correo electrónico válido.' });
+      return;
+    }
+
     setIsTransferring(true);
     setTransferResult(null);
 
-    const res = await transferVehicle(selectedVehicle.id, buyerEmail);
-    setIsTransferring(false);
-
-    if (res.success) {
+    try {
+      const resultado = await transferPreperitaje(idToTransfer, buyerEmail, transferNotes);
+      const datos = resultado.transferencia;
       setTransferResult({
         success: true,
-        folio: res.transferFolio,
-        buyerEmail,
+        folio: datos.folio,
+        buyerEmail: datos.nuevoDueno.correo,
       });
-    } else {
+      setInforme((prev) =>
+        prev
+          ? {
+              ...prev,
+              usuario: {
+                nombre: datos.nuevoDueno.nombre,
+                correo: datos.nuevoDueno.correo,
+              },
+            }
+          : prev
+      );
+      setResolvedId('');
+    } catch (error: any) {
       setTransferResult({
         success: false,
-        error: res.error || 'Error al procesar el traspaso',
+        error: error.message || 'No se pudo completar el traspaso',
       });
-    }
-  };
-
-  // Switch to the buyer's account immediately to demonstrate the transfer
-  const handleSimulateLoginAsBuyer = async () => {
-    if (transferResult?.buyerEmail) {
-      await loginWithEmail(transferResult.buyerEmail, '123456');
-      setShowTransferModal(false);
-      setTransferResult(null);
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -620,15 +663,24 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
 
             {informe
               ? informe.partes.map((parte) => {
-                  const isGood = parte.condicion === 'good';
+                  const isGood = isGoodCondition(parte.condicion);
                   const isNotApplicable = parte.condicion === 'not-applicable';
-                  const badgeLabel = isGood ? 'Conforme' : isNotApplicable ? 'No aplica' : 'Observación';
+                  const isCritical = parte.severidad === 'alta';
+                  const badgeLabel = isGood
+                    ? 'Conforme'
+                    : isNotApplicable
+                      ? 'No aplica'
+                      : isCritical
+                        ? 'Revisión'
+                        : 'Observación';
                   const badgeClasses = isGood
                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                     : isNotApplicable
                       ? 'bg-slate-100 text-slate-600 border-slate-300'
-                      : 'bg-amber-100 text-amber-800 border-amber-300';
-                  const badgeIcon = isGood ? 'verified' : isNotApplicable ? 'remove_circle' : 'warning';
+                      : isCritical
+                        ? 'bg-rose-100 text-rose-800 border-rose-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300';
+                  const badgeIcon = isGood ? 'verified' : isNotApplicable ? 'remove_circle' : isCritical ? 'warning' : 'visibility';
                   const iconClasses =
                     parte.categoria === 'mecanica'
                       ? 'bg-slate-800'
@@ -795,6 +847,96 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
           </div>
         </div>
 
+        {mantenimiento?.tieneInformacion && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded uppercase tracking-wider">
+                    Historial declarado
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mt-1">
+                  {viewMode === 'buyer'
+                    ? 'Mantenimiento que debes conocer antes de comprar'
+                    : 'Mantenimiento registrado en el cuestionario'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Información declarada por el propietario anterior. El nuevo dueño conserva este historial después del traspaso.
+                </p>
+              </div>
+              <span className="material-symbols-outlined text-3xl text-emerald-600">history</span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 space-y-3">
+                <h4 className="text-sm font-black text-amber-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">oil_barrel</span>
+                  Último cambio de aceite
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-xl border border-amber-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Fecha</span>
+                    <strong className="text-slate-900 text-sm">
+                      {formatReportDate(mantenimiento.ultimoCambioAceiteFecha || undefined)}
+                    </strong>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-amber-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Kilometraje al cambio</span>
+                    <strong className="text-slate-900 font-mono text-sm">
+                      {mantenimiento.ultimoCambioAceiteKm !== null
+                        ? `${mantenimiento.ultimoCambioAceiteKm.toLocaleString('es-CO')} km`
+                        : 'No indicado'}
+                    </strong>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-amber-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Km recorridos desde el cambio</span>
+                    <strong className="text-blue-700 font-mono text-sm">
+                      {mantenimiento.kmDesdeCambioAceite !== null
+                        ? `+${mantenimiento.kmDesdeCambioAceite.toLocaleString('es-CO')} km`
+                        : 'No computable'}
+                    </strong>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-amber-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Próximo cambio aproximado</span>
+                    <strong className="text-emerald-700 font-mono text-sm">
+                      {mantenimiento.proximoCambioAceiteReferencia !== null
+                        ? `${mantenimiento.proximoCambioAceiteReferencia.toLocaleString('es-CO')} km (ref. 5.000 km)`
+                        : 'No computable'}
+                    </strong>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 bg-white p-3 rounded-xl border border-amber-100">
+                  <strong className="block text-[10px] uppercase font-bold text-slate-400 mb-0.5">Taller o lugar</strong>
+                  {mantenimiento.ultimoCambioAceiteTaller || 'No indicado'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5 space-y-3">
+                <h4 className="text-sm font-black text-blue-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">build</span>
+                  Último mantenimiento
+                </h4>
+                <div className="bg-white p-3 rounded-xl border border-blue-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Fecha</span>
+                  <strong className="text-slate-900 text-sm">
+                    {formatReportDate(mantenimiento.ultimoMantenimientoFecha || undefined)}
+                  </strong>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-blue-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Taller o lugar</span>
+                  <strong className="text-slate-900 text-sm">
+                    {mantenimiento.ultimoMantenimientoTaller || 'No indicado'}
+                  </strong>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 rounded-xl border border-blue-100">
+                  {mantenimiento.ultimoMantenimientoDescripcion || 'Sin detalle registrado para este mantenimiento.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* MODAL 1: Compartir Ficha con Comprador (Link / QR) */}
@@ -897,16 +1039,7 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
                   El nuevo dueño ahora puede continuar registrando cambios de aceite, llantas y transferirlo en el futuro si decide venderlo.
                 </p>
 
-                {/* 1-Click Simulation Button to verify as buyer */}
                 <div className="space-y-2 pt-2">
-                  <button
-                    onClick={handleSimulateLoginAsBuyer}
-                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-base">switch_account</span>
-                    <span>Probar: Entrar como el Nuevo Dueño ({transferResult.buyerEmail})</span>
-                  </button>
-
                   <button
                     onClick={() => {
                       setShowTransferModal(false);
@@ -942,21 +1075,16 @@ export const FichaVentaScreen: React.FC<FichaVentaScreenProps> = ({ onNavigate, 
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Correo del Nuevo Comprador / Propietario
                   </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-base">
-                      alternate_email
-                    </span>
-                    <input
-                      type="email"
-                      required
-                      value={buyerEmail}
-                      onChange={(e) => setBuyerEmail(e.target.value)}
-                      placeholder="correo.comprador@ejemplo.com"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 font-medium focus:bg-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
+                  <input
+                    type="email"
+                    required
+                    value={buyerEmail}
+                    onChange={(e) => setBuyerEmail(e.target.value.trim())}
+                    placeholder="correo@autocheck.com"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-medium focus:bg-white focus:outline-none focus:border-blue-500"
+                  />
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    Sugerencias para pruebas: <strong>duban.tibaquira@uniminuto.edu.co</strong> o <strong>comprador.nuevo@gmail.com</strong>
+                    El sistema verificará que esa cuenta exista en AutoCheck antes de enviarle el peritaje.
                   </span>
                 </div>
 

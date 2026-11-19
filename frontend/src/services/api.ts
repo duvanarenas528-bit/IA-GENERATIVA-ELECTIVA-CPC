@@ -1,3 +1,5 @@
+import type { AnalisisCuestionarioIA, CatalogResult, ProfileStats } from '../types';
+
 const API_BASE = 'http://localhost:4000/api';
 const API_ORIGIN = API_BASE.replace(/\/api$/, '');
 
@@ -67,6 +69,24 @@ export async function authLogin(correo: string, password: string) {
     throw new Error(data.error || 'Correo o contraseña incorrectos');
   }
   return data;
+}
+
+export async function requestPasswordReset(correo: string) {
+  const res = await api.post('/auth/forgot-password', { correo }, { skipAuthRedirect: true });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'No se pudo solicitar el código');
+  }
+  return data as { message: string; code?: string };
+}
+
+export async function resetPassword(token: string, password: string) {
+  const res = await api.post('/auth/reset-password', { token, password }, { skipAuthRedirect: true });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'No se pudo restablecer la contraseña');
+  }
+  return data as { message: string };
 }
 
 export async function authUploadAvatar(file: File) {
@@ -195,6 +215,20 @@ export async function getPreperitajeInforme(id: string) {
   return json;
 }
 
+export async function analizarFotosIA(id: string) {
+  const res = await api.post(`/preperitajes/${id}/analizar-fotos`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudo analizar las fotos con IA');
+  return json.analisis;
+}
+
+export async function analizarCuestionarioIA(id: string): Promise<AnalisisCuestionarioIA> {
+  const res = await api.post(`/preperitajes/${id}/analizar-cuestionario`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudo analizar el cuestionario con IA');
+  return json.analisis;
+}
+
 export async function getDashboardStats() {
   const res = await api.get('/vehicles/stats');
   const json = await res.json().catch(() => ({}));
@@ -206,5 +240,41 @@ export async function getAdminOverview() {
   const res = await api.get('/admin/overview');
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Error al cargar el panel administrativo');
+  return json;
+}
+
+export async function getCarMakes(): Promise<CatalogResult> {
+  const res = await api.get('/catalog/makes');
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudieron cargar las marcas');
+  return json as CatalogResult;
+}
+
+export async function getCarModels(make: string): Promise<CatalogResult> {
+  const res = await api.get(`/catalog/models?make=${encodeURIComponent(make)}`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudieron cargar los modelos');
+  return json as CatalogResult;
+}
+
+export async function getCarYears(make: string, model: string): Promise<CatalogResult> {
+  const query = `make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}`;
+  const res = await api.get(`/catalog/years?${query}`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudieron cargar los años');
+  return json as CatalogResult;
+}
+
+export async function getProfileStats(): Promise<ProfileStats> {
+  const res = await api.get('/users/me/stats');
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudieron cargar tus estadísticas');
+  return json as ProfileStats;
+}
+
+export async function transferPreperitaje(id: string, correo: string, notas?: string) {
+  const res = await api.post(`/preperitajes/${id}/transferir`, { correo, notas });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'No se pudo realizar el traspaso');
   return json;
 }
