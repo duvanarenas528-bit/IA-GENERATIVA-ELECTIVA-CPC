@@ -14,15 +14,24 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  ...(process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  'https://ia-generativa-electiva-cpc-opal.vercel.app',
+  'http://localhost:5173',
+];
 
 app.set('trust proxy', 1);
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app')
+    ) {
       return callback(null, origin || true);
     }
     return callback(new Error(`Origen no permitido por CORS: ${origin}`));
