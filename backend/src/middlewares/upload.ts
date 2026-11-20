@@ -3,7 +3,9 @@ import path from 'path';
 import crypto from 'crypto';
 import multer from 'multer';
 
-export const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+export const UPLOADS_DIR = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.resolve(process.cwd(), 'uploads');
 
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 

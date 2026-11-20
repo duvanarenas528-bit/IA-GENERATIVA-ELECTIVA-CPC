@@ -309,6 +309,109 @@ Ambos resultados se guardan en el preperitaje y se muestran en el informe. El an
 
 ---
 
+## Despliegue
+
+AutoCheck tiene tres piezas desplegables. El frontend en Vercel no puede funcionar solo: necesita el backend público y el backend necesita PostgreSQL y Redis.
+
+```text
+Vercel (frontend)
+  ↓ VITE_API_URL
+Render/Railway (backend Express)
+  ↓ DATABASE_URL        ↓ REDIS_URL
+Supabase Postgres       Upstash Redis
+  ↓ GEMINI_API_KEY
+Gemini
+```
+
+### 1. Base de datos en Supabase
+
+1. Crear un proyecto de Supabase.
+2. En **Database → Connection strings**, copiar la URI de conexión directa. Debe terminar en `?sslmode=require`.
+3. Desde la raíz del repositorio, aplicar migraciones:
+
+```bash
+DATABASE_URL='postgres://USUARIO:PASSWORD@HOST:5432/BASE?sslmode=require' npm --prefix backend run migrate
+```
+
+4. Usar esa misma `DATABASE_URL` en el backend desplegado. Para tráfico normal también puede usarse el pooler de Supabase; si aparecen errores de prepared statements, volver a la conexión directa o de sesión.
+
+### 2. Redis
+
+El backend usa Redis para refresh tokens, códigos de recuperación y caché del catálogo. Supabase no reemplaza Redis.
+
+1. Crear una base de datos Redis administrada, por ejemplo Upstash.
+2. Copiar la URL `rediss://...`.
+3. Configurarla como `REDIS_URL` en el backend.
+
+### 3. Backend
+
+Desplegar el directorio `backend` en Render, Railway u otro host Node que permita procesos persistentes.
+
+Comandos:
+
+```bash
+npm install
+npm run build
+npm run start
+```
+
+Health check: `GET /api/health`.
+
+Variables de entorno principales:
+
+```env
+NODE_ENV=production
+PORT=10000
+DATABASE_URL=postgres://...?sslmode=require
+REDIS_URL=rediss://...
+FRONTEND_URL=https://TU-PROYECTO.vercel.app
+JWT_ACCESS_SECRET=...
+JWT_REFRESH_SECRET=...
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=7d
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3.5-flash-lite
+API_NINJAS_KEY=...
+COOKIE_SAMESITE=none
+COOKIE_SECURE=true
+PASSWORD_RESET_SHOW_CODE=false
+UPLOADS_DIR=/ruta/persistente/uploads
+```
+
+Si el frontend y el backend están en dominios distintos, `COOKIE_SAMESITE=none` y `COOKIE_SECURE=true` son obligatorios para que las cookies httpOnly funcionen.
+
+> Las fotos se guardan actualmente en disco. En Vercel o en hosts sin disco persistente se perderán. Usa un volumen persistente y `UPLOADS_DIR`, o migra el almacenamiento a Supabase Storage/S3.
+
+### 4. Frontend en Vercel
+
+1. Importar el repositorio en Vercel.
+2. Configurar **Root Directory** en `frontend`.
+3. Framework: `Vite`.
+4. Build command: `npm run build`.
+5. Output directory: `dist`.
+6. Crear la variable de entorno:
+
+```env
+VITE_API_URL=https://TU-BACKEND/api
+```
+
+7. Redeployar.
+8. Si usas dominios de preview de Vercel, agrégalos a `FRONTEND_URL` en el backend separados por comas:
+
+```env
+FRONTEND_URL=https://autocheck.vercel.app,https://autocheck-git-main-tu-usuario.vercel.app
+```
+
+### 5. Verificación posterior
+
+- `GET https://TU-BACKEND/api/health` debe devolver `{"status":"ok"}`.
+- Desde el frontend desplegado, registro/login deben funcionar sin errores CORS.
+- Crear un preperitaje de prueba y verificar que se guarde en Supabase.
+- Verificar que las fotos persistan tras reiniciar el backend.
+- Confirmar que Gemini responde y que las claves no aparecen en el bundle de Vercel.
+
+---
+
 ## Documentación académica
 
 * [Diagrama de componentes](mi-framework-ia/docs/proyecto/07_DIAGRAMA_COMPONENTES.md)

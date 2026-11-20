@@ -11,7 +11,15 @@ import { removeUploadedFile, UPLOADS_DIR } from '../middlewares/upload.js';
 import { requestPasswordReset, resetPassword } from '../services/passwordResetService.js';
 
 const isProd = process.env.NODE_ENV === 'production';
-const showResetCode = process.env.NODE_ENV !== 'production' && process.env.PASSWORD_RESET_SHOW_CODE !== 'false';
+const showResetCode = !isProd && process.env.PASSWORD_RESET_SHOW_CODE !== 'false';
+const cookieSameSite = (process.env.COOKIE_SAMESITE || (isProd ? 'none' : 'lax')) as 'lax' | 'none' | 'strict';
+const cookieSecure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : isProd;
+const baseCookieOptions = {
+  httpOnly: true,
+  sameSite: cookieSameSite,
+  secure: cookieSecure,
+  path: '/',
+} as const;
 
 function serializeUser(row: any) {
   const updatedAt = row.avatar_actualizado_en ? new Date(row.avatar_actualizado_en).getTime() : 0;
@@ -27,24 +35,18 @@ function serializeUser(row: any) {
 
 function setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
   res.cookie('access_token', accessToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: isProd,
+    ...baseCookieOptions,
     maxAge: 15 * 60 * 1000,
-    path: '/',
   });
   res.cookie('refresh_token', refreshToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: isProd,
+    ...baseCookieOptions,
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/',
   });
 }
 
 function clearAuthCookies(res: Response) {
-  res.clearCookie('access_token', { path: '/' });
-  res.clearCookie('refresh_token', { path: '/' });
+  res.clearCookie('access_token', baseCookieOptions);
+  res.clearCookie('refresh_token', baseCookieOptions);
 }
 
 export async function register(req: Request, res: Response) {
@@ -177,11 +179,8 @@ export async function refresh(req: Request, res: Response) {
     const u = user.rows[0];
     const accessToken = generateAccessToken({ id: u.id, correo: u.correo, nombre: u.nombre, role: u.role || 'user' });
     res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: isProd,
+      ...baseCookieOptions,
       maxAge: 15 * 60 * 1000,
-      path: '/',
     });
     return res.json({ user: serializeUser(u) });
   } catch (e) {
