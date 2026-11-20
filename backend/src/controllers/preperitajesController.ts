@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.js';
 import { pool } from '../db/pool.js';
 import { removeUploadedFile, UPLOADS_DIR } from '../middlewares/upload.js';
+import { buildStoragePath, removeStoredImage, uploadImage } from '../utils/storage.js';
 import { buildPreperitajeReport, PREFERITAJE_ZONAS } from '../services/preperitajeReport.js';
 import { analyzePhotosWithGemini } from '../services/photoAnalysisService.js';
 import {
@@ -39,20 +40,19 @@ export async function uploadPreperitajeFoto(req: AuthRequest, res: Response) {
   }
 
   if (!isValidUuid(id)) {
-    removeUploadedFile(file.filename);
     return res.status(404).json({ error: 'Preperitaje no encontrado.' });
   }
 
   const zona = typeof req.body?.zona === 'string' ? req.body.zona.trim() : '';
   if (!PREFERITAJE_ZONAS.includes(zona)) {
-    removeUploadedFile(file.filename);
     return res.status(400).json({ error: 'La zona de la foto no es válida.' });
   }
+
+  let uploadedUrl: string | null = null;
 
   try {
     const owner = await pool.query('SELECT id FROM preperitajes WHERE id = $1 AND user_id = $2', [id, userId]);
     if (owner.rows.length === 0) {
-      removeUploadedFile(file.filename);
       return res.status(404).json({ error: 'Preperitaje no encontrado.' });
     }
 
@@ -60,6 +60,9 @@ export async function uploadPreperitajeFoto(req: AuthRequest, res: Response) {
       'SELECT filename FROM preperitaje_fotos WHERE preperitaje_id = $1 AND zona = $2',
       [id, zona]
     );
+
+    const storagePath = buildStoragePath('preperitajes', id, file.mimetype);
+    uploadedUrl = await uploadImage(storagePath, file.buffer, file.mimetype);
 
     const result = await pool.query(
       `INSERT INTO preperitaje_fotos (preperitaje_id, user_id, zona, filename, mime_type, size_bytes)
@@ -71,14 +74,17 @@ export async function uploadPreperitajeFoto(req: AuthRequest, res: Response) {
          size_bytes = EXCLUDED.size_bytes,
          creado_en = NOW()
        RETURNING *`,
-      [id, userId, zona, file.filename, file.mimetype, file.size]
+      [id, userId, zona, uploadedUrl, file.mimetype, file.size]
     );
 
+    await removeStoredImage(previous.rows[0]?.filename);
     removeUploadedFile(previous.rows[0]?.filename);
 
     return res.status(201).json({ foto: serializeFoto(result.rows[0]) });
   } catch (e) {
-    removeUploadedFile(file.filename);
+    if (uploadedUrl) {
+      await removeStoredImage(uploadedUrl);
+    }
     console.error(e);
     return res.status(500).json({ error: 'No se pudo guardar la foto.' });
   }
@@ -134,12 +140,18 @@ export async function getPreperitajeFotoArchivo(req: AuthRequest, res: Response)
       return res.status(404).json({ error: 'Foto no encontrada.' });
     }
 
-    const filePath = path.join(UPLOADS_DIR, path.basename(result.rows[0].filename));
+    const storedValue = result.rows[0].filename;
+    res.setHeader('Cache-Control', 'private, max-age=60');
+
+    if (typeof storedValue === 'string' && /^https?:\/\//i.test(storedValue)) {
+      return res.redirect(storedValue);
+    }
+
+    const filePath = path.join(UPLOADS_DIR, path.basename(storedValue || ''));
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'El archivo de la foto no está disponible.' });
     }
 
-    res.setHeader('Cache-Control', 'private, max-age=60');
     res.type(result.rows[0].mime_type);
     return res.sendFile(filePath);
   } catch (e) {

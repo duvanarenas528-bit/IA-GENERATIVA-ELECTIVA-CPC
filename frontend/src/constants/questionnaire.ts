@@ -164,6 +164,29 @@ export const PART_CONDITION_OPTIONS: Record<string, ConditionOption[]> = {
   ],
 };
 
+export const PART_INSPECTION_INSTRUCTIONS: Record<string, string> = {
+  'lateral-der':
+    'Párate en una esquina del vehículo y mira de perfil a lo largo de todo el costado para detectar ondas o hundimientos en la lámina. Verifica diferencias de tono en la pintura, abre y cierra cada puerta para comprobar que ajusten sin esfuerzo y revisa la firmeza del espejo retrovisor.',
+  'lateral-izq':
+    'Observa todo el costado en ángulo diagonal contra la luz para identificar abolladuras, rayones o cambios de color en la pintura. Abre y cierra las puertas verificando que las líneas de unión estén parejas y que las manijas y molduras estén completas y firmes.',
+  'frente-capo':
+    'Revisa de frente que el espacio entre el capó y los guardabarros sea simétrico en ambos lados. Observa que el parachoques esté bien ajustado, que la persiana no tenga piezas rotas y que las micas de los faros estén transparentes y sin humedad interna.',
+  'trasera-baul':
+    'Abre y cierra la compuerta del baúl verificando que los amortiguadores la sostengan y que el seguro cierre suave. Revisa que los stops estén intactos, sin filtraciones de agua, y que el parachoques no tenga hundimientos ni desajustes.',
+  'techo-vidrios':
+    'Revisa los vidrios desde adentro hacia afuera contra la luz para detectar piquetes o fisuras. Verifica el sello grabado del fabricante en las esquinas de cada cristal, el estado de los empaques y que no existan manchas de humedad en el tapizado del techo.',
+  'vano-motor':
+    'Con el vehículo apagado y en terreno plano, abre el capó y verifica los niveles en los recipientes de refrigerante, frenos y la varilla de aceite, buscando manchas o fugas frescas. Luego enciende el motor y escucha durante 30 segundos que el arranque sea inmediato y el sonido parejo.',
+  'llantas-frenos':
+    'Gira la dirección hacia un lado para revisar la profundidad y uniformidad del dibujo en toda la banda de rodadura, verificando que no haya grietas ni protuberancias en los costados. Revisa el borde de los 4 rines en busca de golpes y cuenta que todas las tuercas estén completas.',
+  'interior-odometro':
+    'Gira la llave a posición de contacto sin encender para comprobar que prendan los testigos del tablero, y luego enciende el motor verificando que se apaguen las alertas. Revisa la lectura del odómetro, el estado de la tapicería y el funcionamiento de controles, cinturones y aire acondicionado.',
+};
+
+export function inspectionInstructionsForPart(partId: string): string | undefined {
+  return PART_INSPECTION_INSTRUCTIONS[partId];
+}
+
 export function conditionOptionsForPart(partId: string): ConditionOption[] {
   return PART_CONDITION_OPTIONS[partId] || DEFAULT_CONDITION_OPTIONS;
 }

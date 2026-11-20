@@ -1,8 +1,6 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
-import { UPLOADS_DIR } from '../middlewares/upload.js';
+import { readImageBytes } from '../utils/storage.js';
 import { ZONE_LABELS } from './preperitajeReport.js';
 import { conditionLabel } from './questionnaireCatalog.js';
 
@@ -132,7 +130,7 @@ La valoración debe ser un rango estimado en pesos colombianos (COP), consideran
 
   const parts: any[] = [{ text: prompt }];
   for (const foto of fotos) {
-    const bytes = await fs.readFile(path.join(UPLOADS_DIR, path.basename(foto.filename)));
+    const bytes = await readImageBytes(foto.filename);
     parts.push({
       inlineData: {
         mimeType: foto.mime_type || 'image/jpeg',
