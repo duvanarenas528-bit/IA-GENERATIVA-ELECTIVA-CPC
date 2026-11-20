@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
-import { readImageBytes } from '../utils/storage.js';
+import { isImageAvailable, readImageBytes } from '../utils/storage.js';
 import { ZONE_LABELS } from './preperitajeReport.js';
 import { conditionLabel } from './questionnaireCatalog.js';
 
@@ -32,6 +32,16 @@ export type AnalisisFotosIA = z.infer<typeof AnalisisSchema> & {
   aviso: string;
 };
 
+export class ControlledGeminiError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'ControlledGeminiError';
+    this.status = status;
+  }
+}
+
 function extractText(response: any): string {
   return (
     response?.text ||
@@ -50,14 +60,41 @@ function parseJson(text: string): any {
   }
 }
 
-export function friendlyGeminiError(error: any, fallbackMessage = 'No se pudo analizar con IA.'): Error {
-  let message = error?.message || fallbackMessage;
-  try {
-    const parsed = JSON.parse(message);
-    if (parsed?.error?.message) message = parsed.error.message;
-  } catch {}
+function geminiErrorStatus(error: any) {
+  return (
+    error?.status ??
+    error?.code ??
+    error?.response?.status ??
+    error?.error?.status ??
+    error?.error?.code ??
+    error?.cause?.status ??
+    error?.cause?.code ??
+    null
+  );
+}
+
+function geminiErrorMessage(error: any, fallbackMessage: string) {
+  let message = error?.message || error?.error?.message || fallbackMessage;
+  if (typeof message === 'string') {
+    try {
+      const parsed = JSON.parse(message);
+      message = parsed?.error?.message || parsed?.message || message;
+    } catch {}
+  }
+  return String(message);
+}
+
+export function friendlyGeminiError(
+  error: any,
+  fallbackMessage = 'No se pudo analizar con IA.',
+  context = 'gemini'
+): Error {
+  const status = geminiErrorStatus(error);
+  const message = geminiErrorMessage(error, fallbackMessage);
+  console.error(`[${context}] Gemini status=${status ?? 'desconocido'} message=${message}`);
+
   if (message.includes('high demand')) {
-    message = 'Gemini está con alta demanda en este momento. Intenta nuevamente en unos minutos.';
+    return new Error('Gemini está con alta demanda en este momento. Intenta nuevamente en unos minutos.');
   }
   return new Error(message);
 }
@@ -68,11 +105,19 @@ export async function analyzePhotosWithGemini(preperitaje: any, fotos: any[]): P
     throw new Error('GEMINI_API_KEY no está configurada en el backend.');
   }
   if (fotos.length === 0) {
-    throw new Error('Sube al menos una foto antes de analizar.');
+    throw new ControlledGeminiError('Sube al menos una foto antes de analizar.', 400);
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-  const zonasFotografiadas = fotos
+  const fotosDisponibles = fotos.filter((foto) => isImageAvailable(foto?.filename));
+  if (fotosDisponibles.length === 0) {
+    throw new ControlledGeminiError(
+      'Las fotografías del preperitaje no están disponibles en el servidor; vuelve a subirlas e intenta de nuevo.',
+      400
+    );
+  }
+
+  const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const zonasFotografiadas = fotosDisponibles
     .map((foto) => `- ${ZONE_LABELS[foto.zona] || foto.zona}`)
     .join('\n');
 
@@ -129,14 +174,28 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
 La valoración debe ser un rango estimado en pesos colombianos (COP), considerando marca, modelo, año, kilometraje y el estado visible. Usa números sin símbolos ni puntos de miles. Si no hay información suficiente para estimar, usa 0 y explica el motivo en "factores". Incluye en "estado_general" la advertencia de que el resultado es orientativo y no reemplaza un peritaje profesional.`;
 
   const parts: any[] = [{ text: prompt }];
-  for (const foto of fotos) {
-    const bytes = await readImageBytes(foto.filename);
-    parts.push({
-      inlineData: {
-        mimeType: foto.mime_type || 'image/jpeg',
-        data: bytes.toString('base64'),
-      },
-    });
+  let fotosIncluidas = 0;
+
+  for (const foto of fotosDisponibles) {
+    try {
+      const bytes = await readImageBytes(foto.filename);
+      parts.push({
+        inlineData: {
+          mimeType: foto.mime_type || 'image/jpeg',
+          data: bytes.toString('base64'),
+        },
+      });
+      fotosIncluidas += 1;
+    } catch (e: any) {
+      console.error(`[analizar-fotos] Foto ${foto?.id || 'sin-id'} omitida: ${e?.message || String(e)}`);
+    }
+  }
+
+  if (fotosIncluidas === 0) {
+    throw new ControlledGeminiError(
+      'Las fotografías del preperitaje no están disponibles en el servidor; vuelve a subirlas e intenta de nuevo.',
+      400
+    );
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -151,7 +210,7 @@ La valoración debe ser un rango estimado en pesos colombianos (COP), consideran
       },
     });
   } catch (e) {
-    throw friendlyGeminiError(e, 'No se pudo analizar las fotos con IA.');
+    throw friendlyGeminiError(e, 'No se pudo analizar las fotos con IA.', 'analizar-fotos');
   }
 
   const parsed = AnalisisSchema.parse(parseJson(extractText(response)));
@@ -169,7 +228,7 @@ La valoración debe ser un rango estimado en pesos colombianos (COP), consideran
     },
     generadoEn: new Date().toISOString(),
     modelo: model,
-    fotosAnalizadas: fotos.length,
+    fotosAnalizadas: fotosIncluidas,
     aviso: 'Resultado orientativo generado por IA; no reemplaza un peritaje profesional.',
   };
 }

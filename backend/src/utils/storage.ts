@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { supabase, STORAGE_BUCKET } from './supabase.js';
@@ -12,6 +13,15 @@ function isAbsoluteUrl(value: string) {
 
 function isLegacyLocalFilename(value: string) {
   return !isAbsoluteUrl(value) && !value.includes('/') && !value.includes('\\');
+}
+
+export function isImageAvailable(value?: string | null) {
+  if (!value) return false;
+  if (isAbsoluteUrl(value) || storagePathFromStoredValue(value)) return true;
+  if (isLegacyLocalFilename(value)) {
+    return existsSync(path.join(UPLOADS_DIR, path.basename(value)));
+  }
+  return false;
 }
 
 export function extensionFromMime(mimeType: string) {

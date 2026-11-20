@@ -6,7 +6,7 @@ import { pool } from '../db/pool.js';
 import { removeUploadedFile, UPLOADS_DIR } from '../middlewares/upload.js';
 import { buildStoragePath, removeStoredImage, uploadImage } from '../utils/storage.js';
 import { buildPreperitajeReport, PREFERITAJE_ZONAS } from '../services/preperitajeReport.js';
-import { analyzePhotosWithGemini } from '../services/photoAnalysisService.js';
+import { analyzePhotosWithGemini, ControlledGeminiError } from '../services/photoAnalysisService.js';
 import {
   analizarCuestionarioConGemini,
   extraerComentariosCuestionario,
@@ -232,6 +232,9 @@ export async function analizarFotosIA(req: AuthRequest, res: Response) {
 
     return res.json({ analisis });
   } catch (e: any) {
+    if (e instanceof ControlledGeminiError) {
+      return res.status(e.status).json({ error: e.message });
+    }
     console.error('Error al analizar fotos con IA:', e?.message || e);
     return res.status(502).json({ error: e?.message || 'No se pudo analizar las fotos con IA.' });
   }
