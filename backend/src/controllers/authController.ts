@@ -8,6 +8,7 @@ import { redis } from '../config/redis.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { pool } from '../db/pool.js';
 import { removeUploadedFile, UPLOADS_DIR } from '../middlewares/upload.js';
+import { buildStoragePath, removeStoredImage, uploadImage } from '../utils/storage.js';
 import { requestPasswordReset, resetPassword } from '../services/passwordResetService.js';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -213,12 +214,16 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: 'Selecciona una imagen para tu foto de perfil.' });
   }
 
+  let uploadedUrl: string | null = null;
+
   try {
     const previous = await pool.query('SELECT avatar_filename FROM users WHERE id = $1', [userId]);
     if (previous.rows.length === 0) {
-      removeUploadedFile(file.filename);
       return res.status(401).json({ error: 'No autorizado' });
     }
+
+    const storagePath = buildStoragePath('avatars', userId || 'unknown', file.mimetype);
+    uploadedUrl = await uploadImage(storagePath, file.buffer, file.mimetype);
 
     const result = await pool.query(
       `UPDATE users
@@ -227,14 +232,17 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
               avatar_actualizado_en = NOW()
         WHERE id = $3
         RETURNING id, nombre, correo, role, creado_en, avatar_filename, avatar_actualizado_en`,
-      [file.filename, file.mimetype, userId]
+      [uploadedUrl, file.mimetype, userId]
     );
 
+    await removeStoredImage(previous.rows[0]?.avatar_filename);
     removeUploadedFile(previous.rows[0]?.avatar_filename);
 
     return res.status(201).json({ user: serializeUser(result.rows[0]) });
   } catch (e) {
-    removeUploadedFile(file.filename);
+    if (uploadedUrl) {
+      await removeStoredImage(uploadedUrl);
+    }
     console.error(e);
     return res.status(500).json({ error: 'No se pudo guardar la foto de perfil.' });
   }
@@ -255,12 +263,18 @@ export async function getAvatar(req: AuthRequest, res: Response) {
       return res.status(404).json({ error: 'Foto de perfil no encontrada.' });
     }
 
-    const filePath = path.join(UPLOADS_DIR, path.basename(avatar.avatar_filename));
+    const storedValue = avatar.avatar_filename;
+    res.setHeader('Cache-Control', 'private, max-age=300');
+
+    if (typeof storedValue === 'string' && /^https?:\/\//i.test(storedValue)) {
+      return res.redirect(storedValue);
+    }
+
+    const filePath = path.join(UPLOADS_DIR, path.basename(storedValue || ''));
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'El archivo de la foto de perfil no está disponible.' });
     }
 
-    res.setHeader('Cache-Control', 'private, max-age=300');
     res.type(avatar.avatar_mime_type || 'image/jpeg');
     return res.sendFile(filePath);
   } catch (e) {
@@ -289,6 +303,7 @@ export async function deleteAvatar(req: AuthRequest, res: Response) {
       [userId]
     );
 
+    await removeStoredImage(previous.rows[0]?.avatar_filename);
     removeUploadedFile(previous.rows[0]?.avatar_filename);
 
     return res.json({ user: serializeUser(result.rows[0]) });

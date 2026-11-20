@@ -76,6 +76,8 @@ Editar `backend/.env` con las claves reales:
 GEMINI_API_KEY=tu_clave_gemini
 GEMINI_MODEL=gemini-3.5-flash-lite
 API_NINJAS_KEY=tu_clave_api_ninjas
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
 ```
 
 > Las claves deben estar solo en el backend. Nunca se exponen en variables `VITE_*` ni en el frontend.
@@ -372,15 +374,16 @@ JWT_REFRESH_TTL=7d
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.5-flash-lite
 API_NINJAS_KEY=...
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
 COOKIE_SAMESITE=none
 COOKIE_SECURE=true
 PASSWORD_RESET_SHOW_CODE=false
-UPLOADS_DIR=/ruta/persistente/uploads
 ```
 
 Si usas el proxy de `vercel.json`, el navegador ve el API como same-origin y `COOKIE_SAMESITE=lax` funciona. Si el frontend llama al backend directamente desde otro dominio, usa `COOKIE_SAMESITE=none` y `COOKIE_SECURE=true`.
 
-> Las fotos se guardan actualmente en disco. En Vercel o en hosts sin disco persistente se perderán. Usa un volumen persistente y `UPLOADS_DIR`, o migra el almacenamiento a Supabase Storage/S3.
+> Las fotos y avatares nuevos se guardan en el bucket público `autocheck-uploads` de Supabase Storage. El backend guarda la URL pública en la base de datos y los endpoints `/api/preperitajes/:id/fotos/:fotoId/archivo` y `/api/auth/avatar` redirigen a esa URL. `UPLOADS_DIR` solo queda como fallback para archivos locales antiguos.
 
 ### 4. Frontend en Vercel
 
