@@ -3,10 +3,13 @@ import multer from 'multer';
 import { requireAuth } from '../middlewares/auth.js';
 import { MAX_PHOTO_SIZE_BYTES, uploadPreperitajePhoto } from '../middlewares/upload.js';
 import {
+  analizarCuestionarioIA,
+  analizarFotosIA,
   getPreperitajeFotoArchivo,
   getPreperitajeInforme,
   listPreperitajeFotos,
   uploadPreperitajeFoto,
+  transferirPreperitaje,
 } from '../controllers/preperitajesController.js';
 
 const router = Router();
@@ -31,6 +34,9 @@ function handlePhotoUpload(req: Request, res: Response, next: NextFunction) {
 router.use(requireAuth);
 
 router.get('/:id/informe', getPreperitajeInforme);
+router.post('/:id/analizar-fotos', analizarFotosIA);
+router.post('/:id/analizar-cuestionario', analizarCuestionarioIA);
+router.post('/:id/transferir', transferirPreperitaje);
 router.get('/:id/fotos', listPreperitajeFotos);
 router.post('/:id/fotos', handlePhotoUpload, uploadPreperitajeFoto);
 router.get('/:id/fotos/:fotoId/archivo', getPreperitajeFotoArchivo);

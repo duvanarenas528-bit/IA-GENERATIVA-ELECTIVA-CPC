@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { PreperitajeInforme, ScreenId } from '../types';
 import { AutoCheckLogo } from '../components/AutoCheckLogo';
 import { assetUrl, getPreperitajeInforme, listPreperitajes } from '../services/api';
+import { isGoodCondition } from '../constants/questionnaire';
 
 interface VisorA4ScreenProps {
   onNavigate: (screen: ScreenId) => void;
@@ -46,9 +47,10 @@ function scoreVerdict(score: number) {
   return { label: 'REVISIÓN RECOMENDADA', badge: 'REVISIÓN', classes: 'text-rose-700' };
 }
 
-function decisionFor(condition: string) {
-  if (condition === 'good') return { label: 'CONFORME', classes: 'text-emerald-700' };
+function decisionFor(condition: string, severidad?: string) {
+  if (isGoodCondition(condition)) return { label: 'CONFORME', classes: 'text-emerald-700' };
   if (condition === 'not-applicable') return { label: 'NO APLICA', classes: 'text-slate-500' };
+  if (severidad === 'alta') return { label: 'REVISIÓN', classes: 'text-rose-700' };
   return { label: 'OBSERVACIÓN', classes: 'text-amber-700' };
 }
 
@@ -306,6 +308,49 @@ export const VisorA4Screen: React.FC<VisorA4ScreenProps> = ({ onNavigate, preper
                 </p>
               </div>
 
+              {informe.mantenimiento?.tieneInformacion && (
+                <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded text-[10px] text-slate-700">
+                  <p className="font-bold text-emerald-900 uppercase tracking-wider mb-1">
+                    Historial de mantenimiento declarado
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p>
+                      <strong>Último cambio de aceite:</strong>{' '}
+                      {informe.mantenimiento.ultimoCambioAceiteFecha || 'No indicado'}
+                      {informe.mantenimiento.ultimoCambioAceiteKm !== null
+                        ? ` · ${informe.mantenimiento.ultimoCambioAceiteKm.toLocaleString('es-CO')} km`
+                        : ''}
+                    </p>
+                    <p>
+                      <strong>Último mantenimiento:</strong>{' '}
+                      {informe.mantenimiento.ultimoMantenimientoFecha || 'No indicado'}
+                      {informe.mantenimiento.ultimoMantenimientoTaller
+                        ? ` · ${informe.mantenimiento.ultimoMantenimientoTaller}`
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {informe.analisisCuestionario && (
+                <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded text-[10px] text-slate-700">
+                  <p className="font-bold text-indigo-900 uppercase tracking-wider mb-1">
+                    Orientación IA sobre comentarios del cuestionario
+                  </p>
+                  <p className="leading-relaxed">{informe.analisisCuestionario.resumen}</p>
+                  {informe.analisisCuestionario.comentarios.length > 0 && (
+                    <ul className="mt-1.5 space-y-1">
+                      {informe.analisisCuestionario.comentarios.slice(0, 3).map((item, index) => (
+                        <li key={index} className="leading-relaxed">
+                          <strong>{item.parte}:</strong> {item.explicacion}{' '}
+                          <span className="text-indigo-800">→ {item.orientacion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               {/* Vehicle Primary Identification Matrix */}
               <div className="mt-5 grid grid-cols-4 gap-3 text-xs">
                 <div className="p-3 bg-slate-100 rounded border border-slate-200">
@@ -418,7 +463,7 @@ export const VisorA4Screen: React.FC<VisorA4ScreenProps> = ({ onNavigate, preper
                       </tr>
                     )}
                     {partes.map((parte) => {
-                      const decision = decisionFor(parte.condicion);
+                      const decision = decisionFor(parte.condicion, parte.severidad);
                       return (
                         <tr key={parte.id}>
                           <td className="py-2 px-3 font-semibold text-slate-900">{parte.nombre}</td>

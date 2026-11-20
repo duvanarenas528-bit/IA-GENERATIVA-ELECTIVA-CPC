@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.js';
 import { pool } from '../db/pool.js';
 import { ZONE_LABELS } from '../services/preperitajeReport.js';
+import { isGoodCondition } from '../services/questionnaireCatalog.js';
 
 type AdminPart = {
   condition?: string;
@@ -24,9 +25,9 @@ function parseParts(value: unknown): AdminPart[] {
 function summarizeParts(value: unknown) {
   const parts = parseParts(value);
   const totalPartes = parts.length;
-  const partesBuenas = parts.filter((part) => (part.condition || 'good') === 'good').length;
+  const partesBuenas = parts.filter((part) => isGoodCondition(part.condition || 'good')).length;
   const hallazgos = parts.filter(
-    (part) => (part.condition || 'good') !== 'good' && part.condition !== 'not-applicable'
+    (part) => !isGoodCondition(part.condition || 'good') && part.condition !== 'not-applicable'
   );
   const criticos = hallazgos.filter(
     (part) => part.condition === 'broken' || part.severity === 'alta'

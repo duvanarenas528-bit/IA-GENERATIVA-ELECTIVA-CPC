@@ -61,13 +61,42 @@ export interface AdminOverview {
   recientes: AdminRecentPreperitaje[];
 }
 
-export type PartCondition = 
-  | 'good'          // En buen estado / Original
-  | 'scratches'     // Rayones leves superficiales
-  | 'dents'         // Golpes / Abolladuras
-  | 'repainted'     // Repintado / Descolorido
-  | 'broken'        // Pieza rota / Faltante
-  | 'not-applicable';
+export type PartCondition =
+  | 'good'
+  | 'scratches'
+  | 'dents'
+  | 'repainted'
+  | 'broken'
+  | 'not-applicable'
+  | 'glass_scratches'
+  | 'glass_chips'
+  | 'glass_cracks'
+  | 'glass_broken'
+  | 'water_leak'
+  | 'glass_replaced'
+  | 'hard_start'
+  | 'fluid_leak'
+  | 'low_fluids'
+  | 'engine_noise'
+  | 'worn_components'
+  | 'missing_modified_components'
+  | 'previous_repairs'
+  | 'uneven_wear'
+  | 'tread_worn'
+  | 'tire_cracks_bulges'
+  | 'tire_repairs'
+  | 'rims_good'
+  | 'rims_damaged'
+  | 'lug_nuts_missing'
+  | 'mismatched_tires'
+  | 'normal_wear'
+  | 'stained_upholstery'
+  | 'dashboard_damaged'
+  | 'faulty_controls'
+  | 'warning_lights'
+  | 'odometer_visible'
+  | 'odometer_inconsistent'
+  | 'missing_interior_parts';
 
 export interface VehiclePartEvaluation {
   id: string;
@@ -140,6 +169,56 @@ export interface PreperitajeParteInforme {
   severidad: string;
 }
 
+export interface AnalisisIA {
+  estado_general: string;
+  hallazgos: Array<{
+    zona?: string;
+    titulo: string;
+    detalle?: string;
+    severidad?: string;
+  }>;
+  recomendaciones: string[];
+  valoracion: {
+    min: number;
+    max: number;
+    moneda: string;
+    factores?: string[];
+  };
+  generadoEn?: string;
+  modelo?: string;
+  fotosAnalizadas?: number;
+  aviso?: string;
+}
+
+export interface MantenimientoInforme {
+  ultimoCambioAceiteFecha: string | null;
+  ultimoCambioAceiteKm: number | null;
+  ultimoCambioAceiteTaller: string | null;
+  ultimoMantenimientoFecha: string | null;
+  ultimoMantenimientoDescripcion: string | null;
+  ultimoMantenimientoTaller: string | null;
+  kmDesdeCambioAceite: number | null;
+  proximoCambioAceiteReferencia: number | null;
+  tieneInformacion: boolean;
+}
+
+export interface AnalisisCuestionarioIA {
+  resumen: string;
+  comentarios: Array<{
+    parte: string;
+    comentario: string;
+    explicacion: string;
+    orientacion: string;
+    prioridad: string;
+  }>;
+  recomendaciones_generales: string[];
+  preguntas_sugeridas: string[];
+  generadoEn?: string;
+  modelo?: string;
+  comentariosAnalizados?: number;
+  aviso?: string;
+}
+
 export interface PreperitajeInforme {
   aviso: string;
   generadoPor: 'reglas' | 'gemini';
@@ -178,6 +257,9 @@ export interface PreperitajeInforme {
     texto: string;
     recomendacion: string;
   };
+  mantenimiento: MantenimientoInforme;
+  analisisIA?: AnalisisIA | null;
+  analisisCuestionario?: AnalisisCuestionarioIA | null;
   fotos: Array<{
     id: string;
     zona: string;
@@ -185,4 +267,36 @@ export interface PreperitajeInforme {
     url: string;
     creadoEn?: string;
   }>;
+}
+
+export interface CatalogResult {
+  values: string[];
+  source: 'api-ninjas' | 'fallback';
+}
+
+export interface ProfilePeritaje {
+  id: string;
+  placa: string;
+  marca: string | null;
+  linea: string | null;
+  anio: number | null;
+  estado: string;
+  creadoEn: string | null;
+  actualizadoEn: string | null;
+  score: number | null;
+  aprobadoIA: boolean;
+  tieneAnalisisIA: boolean;
+  transferidoA?: string | null;
+}
+
+export interface ProfileStats {
+  stats: {
+    total: number;
+    completados: number;
+    tasaAprobacionIA: number;
+    tiempoPromedioMinutos: number;
+    certificados: number;
+    transferidosRecibidos: number;
+  };
+  peritajes: ProfilePeritaje[];
 }
