@@ -96,7 +96,7 @@ export async function analizarCuestionarioConGemini(preperitaje: any): Promise<A
     throw new Error('El cuestionario no tiene comentarios escritos para analizar.');
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const datos = JSON.stringify(
     {
       vehiculo: {
@@ -149,7 +149,7 @@ Usa un tono respetuoso y práctico. Prioridad alta solo cuando el comentario sug
       },
     });
   } catch (e) {
-    throw friendlyGeminiError(e, 'No se pudo analizar el cuestionario con IA.');
+    throw friendlyGeminiError(e, 'No se pudo analizar el cuestionario con IA.', 'analizar-cuestionario');
   }
 
   const parsed = AnalisisCuestionarioSchema.parse(parseGeminiJson(extractText(response)));

@@ -16,7 +16,7 @@ AutoCheck es una aplicación web full-stack que permite registrar un vehículo, 
 | Backend | Node.js + Express + TypeScript |
 | Base de datos | PostgreSQL |
 | Caché / sesiones | Redis |
-| IA | Gemini (`@google/genai`), modelo `gemini-3.5-flash-lite` |
+| IA | Gemini (`@google/genai`), modelo `gemini-3.8-flash` |
 | Catálogo vehicular | API Ninjas Cars, con caché en Redis y fallback local |
 | Infraestructura local | Docker Compose |
 | Autenticación | JWT en cookies httpOnly + refresh token |
@@ -74,7 +74,7 @@ Editar `backend/.env` con las claves reales:
 
 ```env
 GEMINI_API_KEY=tu_clave_gemini
-GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_MODEL=gemini-3.8-flash
 API_NINJAS_KEY=tu_clave_api_ninjas
 SUPABASE_URL=https://TU-PROYECTO.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
@@ -372,7 +372,7 @@ JWT_REFRESH_SECRET=...
 JWT_ACCESS_TTL=15m
 JWT_REFRESH_TTL=7d
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_MODEL=gemini-3.8-flash
 API_NINJAS_KEY=...
 SUPABASE_URL=https://TU-PROYECTO.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...

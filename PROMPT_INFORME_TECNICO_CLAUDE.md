@@ -89,7 +89,7 @@ El sistema debe dejar claro que sus resultados son **orientativos** y que **no r
 | Backend | Node.js, Express 4, TypeScript |
 | Base de datos | PostgreSQL / Supabase |
 | Caché y sesiones | Redis / Upstash, cliente `ioredis` |
-| IA | Gemini, modelo `gemini-3.5-flash-lite`, SDK `@google/genai` |
+| IA | Gemini, modelo `gemini-3.8-flash`, SDK `@google/genai` |
 | Catálogo vehicular | API Ninjas Cars, caché Redis y fallback local |
 | Autenticación | JWT en cookies httpOnly + refresh token en Redis |
 | Archivos | Multer en memoria + Supabase Storage (`autocheck-uploads`); fallback local solo para archivos antiguos |
