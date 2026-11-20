@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ScreenId, VehiclePartEvaluation, PartCondition } from '../types';
-import { conditionOptionsForPart, severityForCondition } from '../constants/questionnaire';
+import {
+  conditionOptionsForPart,
+  inspectionInstructionsForPart,
+  severityForCondition,
+} from '../constants/questionnaire';
 import { AutoCheckLogo } from '../components/AutoCheckLogo';
 import {
   createPreperitaje,
@@ -576,7 +580,7 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                   Cuéntanos el estado real de tu vehículo
                 </strong>
                 <p className="text-xs text-blue-800 mt-0.5 leading-relaxed">
-                  Selecciona la opción que mejor describa cada parte del auto; las opciones cambian según la sección (carrocería, cristales, motor, llantas o interior). Usa el campo abierto para dar detalles. <strong>La IA analizará tus respuestas para darte recomendaciones preventivas y correctivas en el informe.</strong>
+                  Lee la guía “Cómo inspeccionar esta parte” y selecciona la opción que mejor describa cada parte del auto; las opciones cambian según la sección (carrocería, cristales, motor, llantas o interior). Usa el campo abierto para dar detalles. <strong>La IA analizará tus respuestas para darte recomendaciones preventivas y correctivas en el informe.</strong>
                 </p>
               </div>
             </div>
@@ -704,6 +708,22 @@ export const NuevoPreperitajeScreen: React.FC<NuevoPreperitajeScreenProps> = ({ 
                       Sección {part.category}
                     </span>
                   </div>
+
+                  {inspectionInstructionsForPart(part.id) && (
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3.5 flex items-start gap-2.5">
+                      <span className="material-symbols-outlined text-blue-600 text-lg shrink-0 mt-0.5">
+                        visibility
+                      </span>
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-wider text-blue-900 mb-1">
+                          Cómo inspeccionar esta parte
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-blue-900/80">
+                          {inspectionInstructionsForPart(part.id)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Condition Selector Chips */}
                   <div>
