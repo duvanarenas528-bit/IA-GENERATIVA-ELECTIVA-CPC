@@ -378,7 +378,7 @@ PASSWORD_RESET_SHOW_CODE=false
 UPLOADS_DIR=/ruta/persistente/uploads
 ```
 
-Si el frontend y el backend están en dominios distintos, `COOKIE_SAMESITE=none` y `COOKIE_SECURE=true` son obligatorios para que las cookies httpOnly funcionen.
+Si usas el proxy de `vercel.json`, el navegador ve el API como same-origin y `COOKIE_SAMESITE=lax` funciona. Si el frontend llama al backend directamente desde otro dominio, usa `COOKIE_SAMESITE=none` y `COOKIE_SECURE=true`.
 
 > Las fotos se guardan actualmente en disco. En Vercel o en hosts sin disco persistente se perderán. Usa un volumen persistente y `UPLOADS_DIR`, o migra el almacenamiento a Supabase Storage/S3.
 
@@ -389,18 +389,16 @@ Si el frontend y el backend están en dominios distintos, `COOKIE_SAMESITE=none`
 3. Framework: `Vite`.
 4. Build command: `npm run build`.
 5. Output directory: `dist`.
-6. Crear la variable de entorno:
+6. El archivo `frontend/vercel.json` reenvía `/api/:path*` al backend de Render. El navegador solo habla con el dominio de Vercel.
+7. Crear la variable de entorno:
 
 ```env
-VITE_API_URL=https://TU-BACKEND/api
+VITE_API_URL=/api
 ```
 
-7. Redeployar.
-8. Si usas dominios de preview de Vercel, agrégalos a `FRONTEND_URL` en el backend separados por comas:
+8. Redeployar.
 
-```env
-FRONTEND_URL=https://autocheck.vercel.app,https://autocheck-git-main-tu-usuario.vercel.app
-```
+Con este proxy no hay peticiones cross-origin desde el navegador: se eliminan los bloqueos CORS y las cookies se guardan como same-site en Safari/iPhone. Mantén `COOKIE_SECURE=true` y el backend bajo HTTPS. Si Vercel tiene **Root Directory** en la raíz del repositorio, mueve `vercel.json` a esa raíz.
 
 ### 5. Verificación posterior
 

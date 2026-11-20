@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://ia-generativa-electiva-cpc.onrender.com/api/:path*"
+    }
+  ]
+}
